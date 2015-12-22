@@ -86,6 +86,13 @@ class SampleTable():
         self.group = Group(name)
         self.group.hideTitle = True
         self.group.numColumns = 8
+        trans_att = Par('string', '')
+        trans_att.title = 'transmission att_pos'
+        trans_att.colspan = 4
+        scatt_att = Par('string', '')
+        scatt_att.title = 'scattering att_pos'
+        scatt_att.colspan = 3
+        space1 = Par('space')
         trans_time = Par('float', '60', command='change_trans_time(' \
                          + str(wid) + ')')
         trans_time.title = 'transmission time'
@@ -93,7 +100,8 @@ class SampleTable():
         scatt_time = Par('float', '120', command='change_scatt_time(' \
                          + str(wid) + ')')
         scatt_time.title = 'scattering time'
-        scatt_time.colspan = 4
+        scatt_time.colspan = 3
+        space2 = Par('space')
          
         tit_1 = Par('label', 'idx')
         tit_1.width = 24
@@ -110,13 +118,19 @@ class SampleTable():
         tit_6.colspan = 2
         self.trans_time = trans_time
         self.scatt_time = scatt_time
+        self.trans_att = trans_att
+        self.scatt_att = scatt_att
+        self.space1 = space1
+        self.space2 = space2
         self.t1 = tit_1
         self.t2 = tit_2
         self.t3 = tit_3
         self.t4 = tit_4
         self.t5 = tit_5
         self.t6 = tit_6
-        self.group.add(trans_time, scatt_time, tit_1, tit_2, tit_3, \
+        self.group.add(trans_att, scatt_att, space1, trans_time, \
+                       scatt_time, space2, \
+                       tit_1, tit_2, tit_3, \
                        tit_4, tit_5, tit_6)
         for i in xrange(__number_of_sample__) :
             self.add_sample(Sample(i + 1))
@@ -154,9 +168,15 @@ class SampleTable():
     
     def run(self):
         log('collect neutrons for transmission')
+        if self.trans_att.value != None and len(self.trans_att.value.strip()) > 0:
+            log('drive att_pos to ' + str(self.trans_att.value))
+            att_pos(float(self.trans_att.value))
         for i in self.samples:
             self.samples[i].run_transmission()
         log('collect neutrons for scattering')
+        if self.scatt_att.value != None and len(self.scatt_att.value.strip()) > 0:
+            log('drive att_pos to ' + str(self.scatt_att.value))
+            att_pos(float(self.scatt_att.value))
         for i in self.samples:
             self.samples[i].run_scattering()
         
@@ -188,6 +208,10 @@ class SampleTable():
         self.trans_time.dispose()
         self.scatt_time.dispose()
         self.group.dispose()
+        self.trans_att.dispose()
+        self.scatt_att.dispose()
+        self.space1.dispose()
+        self.space2.dispose()
             
 def get_workflow_block(wid):
     global workflow_list
@@ -230,8 +254,12 @@ def add_block():
     workflow_list.append(wb)
     if not old is None:
         wb.config.value = old.config.value
+        wb.table.t3.value = old.table.t3.value
+        wb.table.t5.value = old.table.t5.value
         wb.table.trans_time.value = old.table.trans_time.value
         wb.table.scatt_time.value = old.table.scatt_time.value
+        wb.table.trans_att.value = old.table.trans_att.value
+        wb.table.scatt_att.value = old.table.scatt_att.value
         for i in wb.table.samples:
             sample = wb.table.samples[i]
             old_sample = old.table.samples[i]
@@ -246,6 +274,7 @@ def run_scan():
     log('start workflow')
     for wb in workflow_list:
         wb.run()
+    log('workflow is finished')
 
 act_rmv = Act('remove_block()', 'Remove Workflow Block')
 act_add = Act('add_block()', 'Add Workflow Block') 
