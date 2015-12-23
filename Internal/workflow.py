@@ -1,4 +1,5 @@
 from gumpy.commons.logger import log
+import pickle
 # Script control setup area
 # script info
 __script__.title = 'Bilby Workflow'
@@ -53,6 +54,40 @@ class WorkflowBlock():
         self.table.run()
         log('workflow finished for block ' + str(self.wid))
         
+    def to_rep(self):
+        rep = dict()
+        rep['config'] = self.config.value
+        rep['trans_setup'] = self.table.trans_setup.value
+        rep['scatt_setup'] = self.table.scatt_setup.value
+        rep['trans_time'] = self.table.trans_time.value
+        rep['scatt_time'] = self.table.scatt_time.value
+        rep['trans_enabled'] = self.table.t3.value
+        rep['scatt_enabled'] = self.table.t5.value
+        for id in self.table.samples:
+            sp = self.table.samples[id]
+            rep['name_' + str(id)] = sp.name_text.value
+            rep['trans_enabled_' + str(id)] = sp.do_trans.value
+            rep['trans_time_' + str(id)] = sp.trans_time.value
+            rep['scatt_enabled_' + str(id)] = sp.do_scatt.value
+            rep['scatt_time_' + str(id)] = sp.scatt_time.value
+        return rep
+    
+    def from_rep(self, rep):
+        self.config.value = rep['config'] 
+        self.table.trans_setup.value = rep['trans_setup'] 
+        self.table.scatt_setup.value = rep['scatt_setup'] 
+        self.table.trans_time.value = rep['trans_time'] 
+        self.table.scatt_time.value = rep['scatt_time'] 
+        self.table.t3.value = rep['trans_enabled'] 
+        self.table.t5.value = rep['scatt_enabled'] 
+        for id in self.table.samples:
+            sp = self.table.samples[id]
+            sp.name_text.value = rep['name_' + str(id)] 
+            sp.do_trans.value = rep['trans_enabled_' + str(id)] 
+            sp.trans_time.value = rep['trans_time_' + str(id)] 
+            sp.do_scatt.value = rep['scatt_enabled_' + str(id)] 
+            sp.scatt_time.value = rep['scatt_time_' + str(id)]
+    
 class Sample():
     def __init__(self, idx):
         self.idx = idx
@@ -86,12 +121,14 @@ class SampleTable():
         self.group = Group(name)
         self.group.hideTitle = True
         self.group.numColumns = 8
-        trans_att = Par('string', '')
-        trans_att.title = 'transmission att_pos'
-        trans_att.colspan = 4
-        scatt_att = Par('string', '')
-        scatt_att.title = 'scattering att_pos'
-        scatt_att.colspan = 3
+        trans_setup = Par('string', '')
+        trans_setup.title = 'transmission setup'
+        trans_setup.colspan = 4
+        trans_setup.height = 40
+        scatt_setup = Par('string', '')
+        scatt_setup.title = 'scattering setup'
+        scatt_setup.colspan = 3
+        scatt_setup.height = 40
         space1 = Par('space')
         trans_time = Par('float', '60', command='change_trans_time(' \
                          + str(wid) + ')')
@@ -118,8 +155,8 @@ class SampleTable():
         tit_6.colspan = 2
         self.trans_time = trans_time
         self.scatt_time = scatt_time
-        self.trans_att = trans_att
-        self.scatt_att = scatt_att
+        self.trans_setup = trans_setup
+        self.scatt_setup = scatt_setup
         self.space1 = space1
         self.space2 = space2
         self.t1 = tit_1
@@ -128,7 +165,7 @@ class SampleTable():
         self.t4 = tit_4
         self.t5 = tit_5
         self.t6 = tit_6
-        self.group.add(trans_att, scatt_att, space1, trans_time, \
+        self.group.add(trans_setup, scatt_setup, space1, trans_time, \
                        scatt_time, space2, \
                        tit_1, tit_2, tit_3, \
                        tit_4, tit_5, tit_6)
@@ -168,15 +205,17 @@ class SampleTable():
     
     def run(self):
         log('collect neutrons for transmission')
-        if self.trans_att.value != None and len(self.trans_att.value.strip()) > 0:
-            log('drive att_pos to ' + str(self.trans_att.value))
-            att_pos(float(self.trans_att.value))
+        ts = self.trans_setup.value
+        if ts != None and len(ts.strip()) > 0:
+            log('running transmission setup ' + str(ts).strip().replace('\r\n', ' + '))
+            exec(str(ts))
         for i in self.samples:
             self.samples[i].run_transmission()
         log('collect neutrons for scattering')
-        if self.scatt_att.value != None and len(self.scatt_att.value.strip()) > 0:
-            log('drive att_pos to ' + str(self.scatt_att.value))
-            att_pos(float(self.scatt_att.value))
+        ss = self.scatt_setup.value
+        if ss != None and len(ss.strip()) > 0:
+            log('running scattering setup ' + str(ss).strip().replace('\r\n', ' + '))
+            exec(str(ss))
         for i in self.samples:
             self.samples[i].run_scattering()
         
@@ -208,8 +247,8 @@ class SampleTable():
         self.trans_time.dispose()
         self.scatt_time.dispose()
         self.group.dispose()
-        self.trans_att.dispose()
-        self.scatt_att.dispose()
+        self.trans_setup.dispose()
+        self.scatt_setup.dispose()
         self.space1.dispose()
         self.space2.dispose()
             
@@ -258,8 +297,8 @@ def add_block():
         wb.table.t5.value = old.table.t5.value
         wb.table.trans_time.value = old.table.trans_time.value
         wb.table.scatt_time.value = old.table.scatt_time.value
-        wb.table.trans_att.value = old.table.trans_att.value
-        wb.table.scatt_att.value = old.table.scatt_att.value
+        wb.table.trans_setup.value = old.table.trans_setup.value
+        wb.table.scatt_setup.value = old.table.scatt_setup.value
         for i in wb.table.samples:
             sample = wb.table.samples[i]
             old_sample = old.table.samples[i]
@@ -276,6 +315,57 @@ def run_scan():
         wb.run()
     log('workflow is finished')
 
+def load_workflow():
+    global workflow_list
+    fn = selectSaveFile(['*.pkl'])
+    if fn is None:
+        return
+    wl = None
+    try :
+        file = open(fn, 'rb')
+        wl = pickle.load(file)
+    finally:
+        file.close()
+    if not wl is None and len(wl) > 0:
+        if len(wl) > len(workflow_list) :
+            for i in xrange(len(wl) - len(workflow_list)):
+                workflow_list.append(WorkflowBlock())
+        elif len(wl) < len(workflow_list) :
+            for i in xrange(len(workflow_list) - len(wl)):
+                rmv = workflow_list.pop()
+                rmv.dispose()
+        for i in xrange(len(wl)):
+            workflow_list[i].from_rep(wl[i])
+    __UI__.updateUI()
+
+def export_workflow():
+    global workflow_list
+    path = selectSaveFile(['*.pkl'])
+    if path == None:
+        return
+    if not path.lower().endswith('.pkl') :
+        path += '.pkl'
+    fi = File(path)
+    fp = fi.getParentFile()
+    if not fp.exists():
+        if not fp.makedirs():
+            print 'Error: failed to make directory: ' + path
+            return
+    slog('workflow exported to ' + path)
+    file = open(path, 'wb')
+    wf_rep = []
+    for wb in workflow_list:
+        wf_rep.append(wb.to_rep())
+    try:
+        pickle.dump(wf_rep, file)
+    except:
+        traceback.print_exc(__writer__)
+    finally:
+        file.close()
+
+    
+act_load = Act('load_workflow()', 'Load Workflow')
+act_exp = Act('export_workflow()', 'Export Workflow')
 act_rmv = Act('remove_block()', 'Remove Workflow Block')
 act_add = Act('add_block()', 'Add Workflow Block') 
 act_run = Act('run_scan()', 'Run Bilby Workflow')
