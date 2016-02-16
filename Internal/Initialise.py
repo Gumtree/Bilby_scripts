@@ -16,6 +16,7 @@ from java.lang import System
 from java.io import File
 from time import strftime, localtime
 import traceback
+import socket
 
 sics.ready = False
 __script__.title = 'Initialised'
@@ -78,8 +79,69 @@ def add_dataset():
     try:
         __DATASOURCE__.addDataset(__file_to_add__, True)
     except:
-        print 'error in adding dataset: ' + __file_to_add__
-    
+        slog( 'error in adding dataset: ' + __file_to_add__ )
+        
+    try:
+        def remote_path(local):
+            result = local.replace('\\', '/')
+            if result[0:2] == 'W:':
+                result = "/mnt/nbi_experiment_data/bilby" + result[2:]
+            elif result[0:2] == 'V:':
+                result = "/mnt/nbi_experiment_hsdata/bilby/hsdata" + result[2:]
+                
+            return result
+        
+        hdfFile = remote_path(str(__file_to_add__))
+        
+        if len(hdfFile) < 8 or hdfFile[-7:].lower() != '.nx.hdf':
+            raise RuntimeError("unknown hdf extension")
+            
+        tarFile = hdfFile[:-7] + ".tar"
+        
+        ds = df[str(__file_to_add__)]
+
+        daqDirName = str(ds['/entry1/instrument/detector/daq_dirname'])
+        datasetNumbers = ds['/entry1/instrument/detector/dataset_number']
+        
+        if len(ds) > 1:
+            datasetNumbers = datasetNumbers[0]
+        binFile = "/mnt/nbi_experiment_hsdata/bilby/hsdata/%s/DATASET_%i/EOS.bin" % (daqDirName, int(datasetNumbers))
+
+        msg = "SRC:\"%s\",\"%s\"\r\nDST:\"%s\"\r\n" % (hdfFile, binFile, tarFile)
+        
+        host = 'ics1-bilby'
+        port = 8123
+        
+        # create TCP/IP socket
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.connect((host, port))
+        
+        try:
+            # receive welcome message from daemon
+            welcome = sock.recv(1024)
+            if not welcome:
+                raise RuntimeError("connection broken")
+        
+            slog( str(welcome) )
+            slog( str(msg) )
+        
+            sock.send(msg)
+            response = ""
+            while True:
+                recv = sock.recv(1024)
+                if not recv:
+                    break
+                response += recv
+        
+            slog( str(response) )
+        
+        finally:
+            sock.close()
+
+    except:
+#        traceback.print_exc(file=sys.stdout)
+        slog( 'failed to create tar file for ' + __file_to_add__ )
+
 class __SaveCountListener__(DynamicControllerListenerAdapter):
     
     def __init__(self):
@@ -91,18 +153,20 @@ class __SaveCountListener__(DynamicControllerListenerAdapter):
         newCount = int(newValue.getStringData());
         if newCount != self.saveCount:
             self.saveCount = newCount;
+            if newCount != 1:
+                return
             try:
                 checkFile = File(__file_name_node__.getValue().getStringData());
                 checkFile = File(__data_folder__ + "/" + checkFile.getName());
                 __file_to_add__ = checkFile.getAbsolutePath();
                 if not checkFile.exists():
-                    print "The target file :" + __file_to_add__ + " can not be found";
+                    slog( "The target file :" + __file_to_add__ + " can not be found" )
                     return
                 runnable = __Display_Runnable__()
                 runnable.run = add_dataset
                 Display.getDefault().asyncExec(runnable)
             except: 
-                print 'failed to add dataset ' + __file_to_add__
+                slog( 'failed to add dataset ' + __file_to_add__ )
                     
 __saveCountListener__ = __SaveCountListener__()
 __save_count_node__.addComponentListener(__saveCountListener__)
@@ -173,7 +237,7 @@ def __std_run_script__(fns):
     
     # check if a list of file names has been given
     if (fns is None or len(fns) == 0) :
-        print 'no input datasets'
+        slog( 'no input datasets' )
     else :
         for fn in fns:
             # load dataset with each file name

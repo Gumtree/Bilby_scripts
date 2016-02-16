@@ -623,8 +623,9 @@ def __run_script__(fns):
     global Plot2
     global Plot3
     
+    print str(fns) + ' selected'
     # check if a list of file names has been given
-    run_action(act_run)
+#    run_action(act_run)
 #    logErr('start new thread')
 #    task = Thread(target=run_action(act_run))
 #    task.start()
