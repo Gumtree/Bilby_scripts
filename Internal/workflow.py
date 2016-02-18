@@ -1,10 +1,328 @@
 from gumpy.commons.logger import log
 import pickle
+import time
+from org.gumtree.gumnix.sics.control.events import DynamicControllerListenerAdapter
+from org.gumtree.gumnix.sics.control import IStateMonitorListener
+from org.gumtree.gumnix.sics.io import SicsProxyListenerAdapter
+from org.eclipse.swt.events import DisposeListener
+from org.eclipse.swt.widgets import TypedListener
+#from org.gumtree.util.messaging import EventHandler
+import sys, os
+sys.path.append(str(os.path.dirname(get_project_path('Internal'))))
+from Internal import sicsext, HISTORY_KEY_WORDS
+from Internal.sicsext import *
+from au.gov.ansto.bragg.nbi.ui.scripting import ConsoleEventHandler
+from org.eclipse.swt.widgets import Display
+from java.lang import Runnable
+from java.lang import System
+from java.io import File
+from time import strftime, localtime
+import traceback
+import socket
+
 # Script control setup area
 # script info
 __script__.title = 'Bilby Workflow'
 __script__.version = '1.0'
 
+sics.ready = False
+
+__data_folder__ = 'W:/data/current'
+#__data_folder__ = 'Z:/testing/pelican'
+__export_folder__ = 'W:/data/current/reports'
+__buffer_log_file__ = __export_folder__
+Dataset.__dicpath__ = get_absolute_path('/Internal/path_table')
+System.setProperty('sics.data.path', __data_folder__)
+
+try:
+    __dispose_all__(None)
+except:
+    pass
+
+fi = File(__buffer_log_file__)
+if not fi.exists():
+    if not fi.mkdirs():
+        print 'Error: failed to make directory: ' + __buffer_log_file__
+__history_log_file__ = __buffer_log_file__ + '/History.txt'
+__buffer_log_file__ += '/LogFile.txt'
+__buffer_logger__ = open(__buffer_log_file__, 'a')
+__history_logger__ = open(__history_log_file__, 'a')
+
+print 'Waiting for SICS connection'
+while sics.getSicsController() == None:
+    time.sleep(1)
+
+time.sleep(3)
+
+__scan_status_node__ = sics.getSicsController().findComponentController('/commands/scan/runscan/feedback/status')
+__scan_variable_node__ = sics.getSicsController().findComponentController('/commands/scan/runscan/scan_variable')
+__save_count_node__ = sics.getSicsController().findComponentController('/experiment/save_count')
+__file_name_node__ = sics.getSicsController().findComponentController('/experiment/file_name')
+__file_status_node__ = sics.getSicsController().findComponentController('/experiment/file_status')
+#saveCount = int(saveCountNode.getValue().getIntData())
+__cur_status__ = str(__scan_status_node__.getValue().getStringData())
+__file_name__ = str(__file_name_node__.getValue().getStringData())
+
+class __Display_Runnable__(Runnable):
+    
+    def __init__(self):
+        pass
+    
+    def run(self):
+        global __UI__
+        global __dispose_listener__
+        __UI__.addDisposeListener(__dispose_listener__)
+
+__file_to_add__ = None
+__newfile_enabled__ = True
+def add_dataset():
+    global __newfile_enabled__
+    if not __newfile_enabled__ :
+        return
+    if __file_to_add__ is None:
+        return
+    global __DATASOURCE__
+    try:
+        __DATASOURCE__.addDataset(__file_to_add__, True)
+    except:
+        slog( 'error in adding dataset: ' + __file_to_add__ )
+        
+    try:
+        def remote_path(local):
+            result = local.replace('\\', '/')
+            if result[0:2] == 'W:':
+                result = "/mnt/nbi_experiment_data/bilby" + result[2:]
+            elif result[0:2] == 'V:':
+                result = "/mnt/nbi_experiment_hsdata/bilby/hsdata" + result[2:]
+                
+            return result
+        
+        hdfFile = remote_path(str(__file_to_add__))
+        
+        if len(hdfFile) < 8 or hdfFile[-7:].lower() != '.nx.hdf':
+            raise RuntimeError("unknown hdf extension")
+            
+        tarFile = hdfFile[:-7] + ".tar"
+        
+        ds = df[str(__file_to_add__)]
+
+        daqDirName = str(ds['/entry1/instrument/detector/daq_dirname'])
+        datasetNumbers = ds['/entry1/instrument/detector/dataset_number']
+        
+        if len(ds) > 1:
+            datasetNumbers = datasetNumbers[0]
+        binFile = "/mnt/nbi_experiment_hsdata/bilby/hsdata/%s/DATASET_%i/EOS.bin" % (daqDirName, int(datasetNumbers))
+
+        msg = "SRC:\"%s\",\"%s\"\r\nDST:\"%s\"\r\n" % (hdfFile, binFile, tarFile)
+        
+        host = 'ics1-bilby'
+        port = 8123
+        
+        # create TCP/IP socket
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.connect((host, port))
+        
+        try:
+            # receive welcome message from daemon
+            welcome = sock.recv(1024)
+            if not welcome:
+                raise RuntimeError("connection broken")
+        
+            slog( str(welcome) )
+            slog( str(msg) )
+        
+            sock.send(msg)
+            response = ""
+            while True:
+                recv = sock.recv(1024)
+                if not recv:
+                    break
+                response += recv
+        
+            slog( str(response) )
+        
+        finally:
+            sock.close()
+
+    except:
+#        traceback.print_exc(file=sys.stdout)
+        slog( 'failed to create tar file for ' + __file_to_add__ )
+
+class __SaveCountListener__(DynamicControllerListenerAdapter):
+    
+    def __init__(self):
+        self.saveCount = __save_count_node__.getValue().getIntData()
+        pass
+    
+    def valueChanged(self, controller, newValue):
+        global __file_to_add__
+        newCount = int(newValue.getStringData());
+        if newCount != self.saveCount:
+            self.saveCount = newCount;
+            if newCount != 1:
+                return
+            try:
+                checkFile = File(__file_name_node__.getValue().getStringData());
+                checkFile = File(__data_folder__ + "/" + checkFile.getName());
+                __file_to_add__ = checkFile.getAbsolutePath();
+                if not checkFile.exists():
+                    slog( "The target file :" + __file_to_add__ + " can not be found" )
+                    return
+                runnable = __Display_Runnable__()
+                runnable.run = add_dataset
+                Display.getDefault().asyncExec(runnable)
+            except: 
+                slog( 'failed to add dataset ' + __file_to_add__ )
+                    
+__saveCountListener__ = __SaveCountListener__()
+__save_count_node__.addComponentListener(__saveCountListener__)
+
+def update_buffer_log_folder():
+    global __buffer_log_file__, __export_folder__, __buffer_logger__, __history_log_file__, __history_logger__
+    __buffer_log_file__ = __export_folder__
+    fi = File(__buffer_log_file__)
+    if not fi.exists():
+        if not fi.mkdirs():
+            print 'Error: failed to make directory: ' + __buffer_log_file__
+    __history_log_file__ = __buffer_log_file__ + '/History.txt'
+    __buffer_log_file__ += '/LogFile.txt'
+    if __buffer_logger__:
+        __buffer_logger__.close()
+    __buffer_logger__ = open(__buffer_log_file__, 'a')
+    if __history_logger__:
+         __history_logger__.close()
+    __history_logger__ = open(__history_log_file__, 'a')
+
+class __State_Monitor__(IStateMonitorListener):
+    def __init__(self):
+        pass
+
+    def stateChanged(state, infoMessage):
+        print state
+        print infoMessage
+        pass
+
+
+def __dispose__():
+    pass
+#    __scan_status_node__.removeComponentListener(__statusListener__)
+#    __m2_node__.removeComponentListener(__m2_listener__)
+#    __s1_node__.removeComponentListener(__s1_listener__)
+#    __s2_node__.removeComponentListener(__s2_listener__)
+#    __a2_node__.removeComponentListener(__a2_listener__)
+
+def __load_experiment_data__():
+    basename = sicsext.getBaseFilename()
+    fullname = str(System.getProperty('sics.data.path') + '/' + basename)
+    df.datasets.clear()
+    ds = df[fullname]
+    data = ds[str(data_name.value)]
+    axis = ds[str(axis_name.value)]
+    if data.size > axis.size:
+        data = data[:axis.size]
+    ds2 = Dataset(data, axes=[axis])
+    ds2.title = ds.id
+    ds2.location = fullname
+    Plot1.set_dataset(ds2)
+    Plot1.x_label = axis_name.value
+    Plot1.y_label = str(data_name.value)
+    Plot1.title = str(data_name.value) + ' vs ' + axis_name.value
+    Plot1.pv.getPlot().setMarkerEnabled(True)
+def logBook(text):
+    global __buffer_logger__
+    global __history_logger__
+    try:
+        tsmp = strftime("[%Y-%m-%d %H:%M:%S]", localtime())
+        __buffer_logger__.write(tsmp + ' ' + text + '\n')
+        __buffer_logger__.flush()
+        for item in HISTORY_KEY_WORDS:
+            if text.startswith(item):
+                __history_logger__.write(tsmp + ' ' + text + '\n')
+                __history_logger__.flush()
+    except:
+        traceback.print_exc(file=sys.stdout)
+        print 'failed to log'
+    
+def slog(text):
+    logln(text + '\n')
+    logBook(text)
+
+class BatchStatusListener(SicsProxyListenerAdapter):
+    
+    def __init__(self):
+        pass
+    
+    def proxyConnected(self):
+        pass
+
+    def proxyConnectionReqested(self):
+        pass
+
+    def proxyDisconnected(self):
+        pass
+
+    def messageReceived(self, message, channelId):
+        if str(channelId) == 'rawBatch':
+            logBook(message)
+
+    def messageSent(self, message, channelId):
+        pass
+
+try:
+    sics.SicsCore.getSicsManager().proxy().removeProxyListener(__batch_status_listener__)
+except:
+    pass
+__batch_status_listener__ = BatchStatusListener()
+sics.SicsCore.getSicsManager().proxy().addProxyListener(__batch_status_listener__)
+
+
+class SICSConsoleEventHandler(ConsoleEventHandler):
+    
+    def __init__(self, topic):
+        ConsoleEventHandler.__init__(self, topic)
+    
+    def handleEvent(self, event):
+        data = str(event.getProperty('sentMessage'))
+        logBook(data)
+
+__sics_console_event_handler_sent__ = SICSConsoleEventHandler('org/gumtree/ui/terminal/telnet/sent')
+__sics_console_event_handler_received__ = SICSConsoleEventHandler('org/gumtree/ui/terminal/telnet/received')
+__sics_console_event_handler_sent__.activate()
+__sics_console_event_handler_received__.activate()
+
+class __Dispose_Listener__(DisposeListener):
+    
+    def __init__(self):
+        pass
+    
+    def widgetDisposed(self, event):
+        pass
+    
+def __dispose_all__(event):
+    global __batch_status_listener__
+    global __sics_console_event_handler_sent__
+    global __sics_console_event_handler_received__
+    global __statusListener__
+    global __save_count_node__
+    global __saveCountListener__
+    sics.SicsCore.getSicsManager().proxy().removeProxyListener(__batch_status_listener__)
+    __sics_console_event_handler_sent__.deactivate()
+    __sics_console_event_handler_received__.deactivate()
+    __save_count_node__.removeComponentListener(__saveCountListener__)
+    if __buffer_logger__:
+        __buffer_logger__.close()
+    if __history_logger__:
+         __history_logger__.close()
+    
+
+__dispose_listener__ = __Dispose_Listener__()
+__dispose_listener__.widgetDisposed = __dispose_all__
+
+
+__display_run__ = __Display_Runnable__()
+Display.getDefault().asyncExec(__display_run__)
+
+sics.ready = True
 # Use below example to create parameters.
 # The type can be string, int, float, bool, file.
 
@@ -33,21 +351,18 @@ class WorkflowBlock():
         cenabled = Par('bool', True, command \
                        = 'set_enabled(' + str(self.wid) + ')')
         cenabled.title = 'enable/disable'
-        cenabled.colspan = 2
         cremove = Act('remove_block(' + str(self.wid) + ')', 'Remove This Block')
 #        cremove = Act('run1()', 'Remove This Block')
         cremove.name = 'cremove_' + str(self.wid)
-        cremove.colspan = 2
         globals()[str(cremove.name)] = cremove
         ctitle = Par('string', tt, command \
                      = 'update_title(' + str(self.wid) + ')')
         ctitle.title = 'title'
-        ctitle.colspan = 2
         ctext = Par('string', '')
-        ctext.height = 80
-        ctext.colspan = 2
+        ctext.height = 60
+        ctext.rowspan = 3
         ctext.title = 'configuration'
-        gc.add(cenabled, ctitle, cremove, ctext)
+        gc.add(cenabled, ctext, ctitle, cremove)
         #gs = Group('samples')
         gt = SampleTable(self.wid)
         gc.add(gt.group)
@@ -99,6 +414,7 @@ class WorkflowBlock():
         if self.need_to_run() :
             self.remove.enabled = False
             self.config.enabled = False
+            self.group.highlight = True
 #            self.new_block.enabled = False
             try:
                 slog('running configuration setup')
@@ -106,6 +422,7 @@ class WorkflowBlock():
                 self.table.run()
                 slog('block finished: ' + str(tt))
             finally:
+                self.group.highlight = False
                 self.remove.enabled = True
                 self.config.enabled = True
 #                self.new_block.enabled = True
@@ -204,14 +521,24 @@ class Sample():
     def run_transmission(self):
         if self.do_trans.value and len(self.trans_res.value.strip()) == 0:
             slog('start transmission collect for sample number ' + str(self.idx))
-            scan10(self.idx, self.trans_time.value, self.name_text.value)
-            self.trans_res.value = get_base_filename()
-        
+            self.trans_res.value = 'Counting'
+            self.trans_res.highlight = True
+            try:
+                scan10(self.idx, self.trans_time.value, self.name_text.value)
+                self.trans_res.value = get_base_filename()
+            finally:
+                self.trans_res.highlight = False
+                
     def run_scattering(self):
         if self.do_scatt.value and len(self.scatt_res.value.strip()) == 0:
             slog('start scattering collect for sample number ' + str(self.idx))
-            scan10(self.idx, self.scatt_time.value, self.name_text.value)
-            self.scatt_res.value = get_base_filename()
+            self.scatt_res.value = 'Counting'
+            self.scatt_res.highlight = True
+            try:
+                scan10(self.idx, self.scatt_time.value, self.name_text.value)
+                self.scatt_res.value = get_base_filename()
+            finally:
+                self.scatt_res.highlight = False
             
     def set_enabled(self, flag):
         self.id_label.enabled = flag
@@ -531,7 +858,6 @@ def add_block():
 
 def run_scan():
     act_load.enabled = False
-    act_rmv.enabled = False
     act_run.enabled = False
     try:
         slog('start Bilby workflow')
@@ -543,7 +869,6 @@ def run_scan():
         slog('workflow is finished')
     finally:
         act_load.enabled = True
-        act_rmv.enabled = True
         act_run.enabled = True
         
 def load_workflow():
@@ -598,12 +923,12 @@ def export_workflow():
 act_load = Act('load_workflow()', 'Load Workflow')
 act_exp = Act('export_workflow()', 'Export Workflow')
 act_exp.independent = True
-act_rmv = Act('remove_block()', 'Remove Workflow Block')
-act_rmv.independent = True
+#act_rmv = Act('remove_block()', 'Remove Workflow Block')
+#act_rmv.independent = True
 act_add = Act('add_block()', 'Add Workflow Block')
 act_add.independent = True 
 act_run = Act('run_scan()', 'Run Bilby Workflow')
-act_run.colspan = 2
+#act_run.colspan = 2
     
 #def add_sample(table, i):
 ##    group.add(s1_idx, s1_name, s1_trans, s1_trans_time, s1_trans_res, s1_scatt, s1_scatt_time, s1_scatt_res)
@@ -614,6 +939,22 @@ workflow_list.append(WorkflowBlock())
 # Use below example to create a new Plot
 # Plot4 = Plot(title = 'new plot')
 
+def __dataset_selected__(datasets):
+    global __selected_dataset__
+    __selected_dataset__ = datasets
+    dfs = __DATASOURCE__.getSelectedDatasets()
+    __INFOTEXT__.clear()
+    for df in dfs:
+        fid = df.getFileID() + ': '
+        __INFOTEXT__.appendText(fid, 'bold')
+        des = ''
+        if df.getTitle() != None:
+            des += df.getTitle() + '\n'
+        if df.getDescription() != None:
+            des += ' ' * len(fid) + df.getDescription() + '\n'
+        des += '\n'
+        __INFOTEXT__.appendText(des)
+    
 # This function is called when pushing the Run button in the control UI.
 def __run_script__(fns):
     from threading import Thread

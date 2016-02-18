@@ -81,66 +81,6 @@ def add_dataset():
     except:
         slog( 'error in adding dataset: ' + __file_to_add__ )
         
-    try:
-        def remote_path(local):
-            result = local.replace('\\', '/')
-            if result[0:2] == 'W:':
-                result = "/mnt/nbi_experiment_data/bilby" + result[2:]
-            elif result[0:2] == 'V:':
-                result = "/mnt/nbi_experiment_hsdata/bilby/hsdata" + result[2:]
-                
-            return result
-        
-        hdfFile = remote_path(str(__file_to_add__))
-        
-        if len(hdfFile) < 8 or hdfFile[-7:].lower() != '.nx.hdf':
-            raise RuntimeError("unknown hdf extension")
-            
-        tarFile = hdfFile[:-7] + ".tar"
-        
-        ds = df[str(__file_to_add__)]
-
-        daqDirName = str(ds['/entry1/instrument/detector/daq_dirname'])
-        datasetNumbers = ds['/entry1/instrument/detector/dataset_number']
-        
-        if len(ds) > 1:
-            datasetNumbers = datasetNumbers[0]
-        binFile = "/mnt/nbi_experiment_hsdata/bilby/hsdata/%s/DATASET_%i/EOS.bin" % (daqDirName, int(datasetNumbers))
-
-        msg = "SRC:\"%s\",\"%s\"\r\nDST:\"%s\"\r\n" % (hdfFile, binFile, tarFile)
-        
-        host = 'ics1-bilby'
-        port = 8123
-        
-        # create TCP/IP socket
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.connect((host, port))
-        
-        try:
-            # receive welcome message from daemon
-            welcome = sock.recv(1024)
-            if not welcome:
-                raise RuntimeError("connection broken")
-        
-            slog( str(welcome) )
-            slog( str(msg) )
-        
-            sock.send(msg)
-            response = ""
-            while True:
-                recv = sock.recv(1024)
-                if not recv:
-                    break
-                response += recv
-        
-            slog( str(response) )
-        
-        finally:
-            sock.close()
-
-    except:
-#        traceback.print_exc(file=sys.stdout)
-        slog( 'failed to create tar file for ' + __file_to_add__ )
 
 class __SaveCountListener__(DynamicControllerListenerAdapter):
     
@@ -315,48 +255,6 @@ def slog(text):
     logln(text + '\n')
     logBook(text)
 
-class BatchStatusListener(SicsProxyListenerAdapter):
-    
-    def __init__(self):
-        pass
-    
-    def proxyConnected(self):
-        pass
-
-    def proxyConnectionReqested(self):
-        pass
-
-    def proxyDisconnected(self):
-        pass
-
-    def messageReceived(self, message, channelId):
-        if str(channelId) == 'rawBatch':
-            logBook(message)
-
-    def messageSent(self, message, channelId):
-        pass
-
-try:
-    sics.SicsCore.getSicsManager().proxy().removeProxyListener(__batch_status_listener__)
-except:
-    pass
-__batch_status_listener__ = BatchStatusListener()
-sics.SicsCore.getSicsManager().proxy().addProxyListener(__batch_status_listener__)
-
-
-class SICSConsoleEventHandler(ConsoleEventHandler):
-    
-    def __init__(self, topic):
-        ConsoleEventHandler.__init__(self, topic)
-    
-    def handleEvent(self, event):
-        data = str(event.getProperty('sentMessage'))
-        logBook(data)
-
-__sics_console_event_handler_sent__ = SICSConsoleEventHandler('org/gumtree/ui/terminal/telnet/sent')
-__sics_console_event_handler_received__ = SICSConsoleEventHandler('org/gumtree/ui/terminal/telnet/received')
-__sics_console_event_handler_sent__.activate()
-__sics_console_event_handler_received__.activate()
 
 class __Dispose_Listener__(DisposeListener):
     
@@ -367,15 +265,8 @@ class __Dispose_Listener__(DisposeListener):
         pass
     
 def __dispose_all__(event):
-    global __batch_status_listener__
-    global __sics_console_event_handler_sent__
-    global __sics_console_event_handler_received__
-    global __statusListener__
     global __save_count_node__
     global __saveCountListener__
-    sics.SicsCore.getSicsManager().proxy().removeProxyListener(__batch_status_listener__)
-    __sics_console_event_handler_sent__.deactivate()
-    __sics_console_event_handler_received__.deactivate()
     __save_count_node__.removeComponentListener(__saveCountListener__)
     if __buffer_logger__:
         __buffer_logger__.close()
@@ -392,4 +283,3 @@ Display.getDefault().asyncExec(__display_run__)
 
 sics.ready = True
 
-load_script('workflow.py')
