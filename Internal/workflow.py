@@ -1,6 +1,7 @@
 from gumpy.commons.logger import log
 import pickle
 import time
+from time import strftime, localtime
 from org.gumtree.gumnix.sics.control.events import DynamicControllerListenerAdapter
 from org.gumtree.gumnix.sics.control import IStateMonitorListener
 from org.gumtree.gumnix.sics.io import SicsProxyListenerAdapter
@@ -19,6 +20,7 @@ from java.io import File
 from time import strftime, localtime
 import traceback
 import socket
+from xml.etree.ElementTree import Element, SubElement, ElementTree, tostring
 
 # Script control setup area
 # script info
@@ -476,6 +478,12 @@ class WorkflowBlock():
         for i in self.table.samples:
             self.table.samples[i].reset_trans_result()
             self.table.samples[i].reset_scatt_result()
+            
+    def appendXML(self, parent):
+        if self.enabled.value:
+            block = SubElement(parent, 'config')
+            block.set('name', self.title.value)
+            self.table.appendXML(block)
         
 class Sample():
     def __init__(self, idx):
@@ -564,6 +572,16 @@ class Sample():
 
     def need_to_run_scatt(self):
         return self.do_scatt.value and len(self.scatt_res.value.strip()) == 0
+    
+    def appendXML(self, parent):
+        if len(self.trans_res.value.strip()) > 0 or len(self.scatt_res.value.strip()) > 0:
+            sp = SubElement(parent, 'sample')
+            sp.set('index', str(self.idx))
+            sp.set('name', self.name_text.value.strip())
+            trans = SubElement(sp, 'transmission')
+            trans.text = self.trans_res.value.strip()
+            scatt = SubElement(sp, 'scattering')
+            scatt.text = self.scatt_res.value.strip()
         
 class SampleTable():
     def __init__(self, wid, name = 'Samples'):
@@ -743,6 +761,11 @@ class SampleTable():
         self.scatt_setup.dispose()
         self.space1.dispose()
         self.space2.dispose()
+        
+    def appendXML(self, parent):
+        for i in sorted(self.samples):
+            sp = self.samples[i]
+            sp.appendXML(parent)
 
 def update_title(wid):
     b = get_workflow_block(wid)
@@ -870,6 +893,7 @@ def run_scan():
     finally:
         act_load.enabled = True
         act_run.enabled = True
+        export_report()
         
 def load_workflow():
     global workflow_list
@@ -919,6 +943,16 @@ def export_workflow():
     finally:
         file.close()
 
+def export_report():
+    global __export_folder__
+    root = Element('workflow')
+    tree = ElementTree(root)
+    for bl in workflow_list:
+        bl.appendXML(root)
+    fn = strftime("%Y-%m-%dT%H-%M-%S", localtime())
+    fn = __export_folder__ + '/' + 'BBY_' + fn + '.xml'
+    tree.write(fn)
+    slog('Report XML created at ' + fn)
     
 act_load = Act('load_workflow()', 'Load Workflow')
 act_exp = Act('export_workflow()', 'Export Workflow')
