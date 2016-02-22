@@ -21,6 +21,7 @@ from time import strftime, localtime
 import traceback
 import socket
 from xml.etree.ElementTree import Element, SubElement, ElementTree, tostring
+from gumpy.commons.logger import n_logger
 
 # Script control setup area
 # script info
@@ -427,6 +428,10 @@ class WorkflowBlock():
                 self.group.highlight = False
                 self.remove.enabled = True
                 self.config.enabled = True
+                html = self.get_html()
+                if not html is None:
+                    slog('upload scan result to notebook database')
+                    n_logger.log_table(html)
 #                self.new_block.enabled = True
         else:
             slog('block: ' + str(self.title.value) + ' skipped')
@@ -479,11 +484,25 @@ class WorkflowBlock():
             self.table.samples[i].reset_trans_result()
             self.table.samples[i].reset_scatt_result()
             
-    def appendXML(self, parent):
+    def append_xml(self, parent):
         if self.enabled.value:
             block = SubElement(parent, 'config')
             block.set('name', self.title.value)
-            self.table.appendXML(block)
+            self.table.append_xml(block)
+
+    def get_html(self):
+        if self.enabled.value:
+            html = self.table.get_html(self.title.value)
+            try:
+                span = Element('span')
+                span.set('class', 'class_span_tablefoot')
+                span.text = 'L1=%.1f, L2=%.1f' % (sics.get_raw_value('gs_l1'), \
+                                                  sics.get_raw_value('gs_l2_det'))
+                html += tostring(span)
+            except:
+                pass
+            return html
+        return None
         
 class Sample():
     def __init__(self, idx):
@@ -573,7 +592,7 @@ class Sample():
     def need_to_run_scatt(self):
         return self.do_scatt.value and len(self.scatt_res.value.strip()) == 0
     
-    def appendXML(self, parent):
+    def append_xml(self, parent):
         if len(self.trans_res.value.strip()) > 0 or len(self.scatt_res.value.strip()) > 0:
             sp = SubElement(parent, 'sample')
             sp.set('index', str(self.idx))
@@ -583,6 +602,29 @@ class Sample():
             scatt = SubElement(sp, 'scattering')
             scatt.text = self.scatt_res.value.strip()
         
+    def get_html_elmt(self):
+        if len(self.trans_res.value.strip()) > 0 or len(self.scatt_res.value.strip()) > 0:
+            tr = Element('tr')
+            td = SubElement(tr, 'td')
+            td.text = str(self.idx)
+            td = SubElement(tr, 'td')
+            td.text = str(self.name_text.value.strip())
+            td = SubElement(tr, 'td')
+            td.text = get_short_pdfname(self.trans_res.value.strip())
+            td = SubElement(tr, 'td')
+            td.text = get_short_pdfname(self.scatt_res.value.strip())
+            td = SubElement(tr, 'td')
+            td.text = str(self.scatt_time.value)
+            td = SubElement(tr, 'td')
+            return tr
+        return None
+        
+def get_short_pdfname(fn):
+    idx = fn.find('.')
+    if idx > 0:
+        return fn[0:idx]
+    return fn
+    
 class SampleTable():
     def __init__(self, wid, name = 'Samples'):
         self.wid = wid
@@ -762,11 +804,49 @@ class SampleTable():
         self.space1.dispose()
         self.space2.dispose()
         
-    def appendXML(self, parent):
+    def append_xml(self, parent):
         for i in sorted(self.samples):
             sp = self.samples[i]
-            sp.appendXML(parent)
+            sp.append_xml(parent)
 
+    def get_html(self, title):
+        table = Element('table')
+        table.set('align', 'center')
+        table.set('border', '1')
+        table.set('cellpadding', '2')
+        table.set('cellspacing', '0')
+        table.set('class', 'xmlTable')
+        table.set('style', 'table-layout:fixed; width:100%; word-wrap:break-word')
+        tr = SubElement(table, 'tr')
+        th = SubElement(tr, 'th')
+        th.set('colspan', '2')
+        th.text = strftime("%Y-%m-%dT%H:%M:%S", localtime())
+        th = SubElement(tr, 'th')
+        th.set('colspan', '4')
+        th.text = title
+        
+        tr = SubElement(table, 'tr')
+        th = SubElement(tr, 'th')
+        th.text = 'Position'
+        th = SubElement(tr, 'th')
+        th.text = 'Sample Name'
+        th = SubElement(tr, 'th')
+        th.text = 'Transmission'
+        th = SubElement(tr, 'th')
+        th.text = 'Scattering'
+        th = SubElement(tr, 'th')
+        th.text = 'Preset'
+        th = SubElement(tr, 'th')
+        th.text = 'Comment'
+        
+        for i in sorted(self.samples):
+            sp = self.samples[i]
+            elmt = sp.get_html_elmt()
+            if not elmt is None:
+                table.append(elmt)
+            
+        return tostring(table, method = 'html')
+    
 def update_title(wid):
     b = get_workflow_block(wid)
     if not b is None:
@@ -948,11 +1028,18 @@ def export_report():
     root = Element('workflow')
     tree = ElementTree(root)
     for bl in workflow_list:
-        bl.appendXML(root)
+        bl.append_xml(root)
     fn = strftime("%Y-%m-%dT%H-%M-%S", localtime())
     fn = __export_folder__ + '/' + 'BBY_' + fn + '.xml'
     tree.write(fn)
     slog('Report XML created at ' + fn)
+    
+#def upload_html(wid):
+#    bl = get_workflow_block(wid)
+#    if not bl is None:
+#        html = bl.get_html()
+#        if not html is None:
+#            n_logger.log_table(html)
     
 act_load = Act('load_workflow()', 'Load Workflow')
 act_exp = Act('export_workflow()', 'Export Workflow')
