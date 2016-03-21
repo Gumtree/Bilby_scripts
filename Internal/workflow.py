@@ -339,6 +339,12 @@ __script__.numColumns = 2
 workflow_list = []
 __workflow_id__ = 0
 __report_folder__ = 'W:/data/current/reports/pWorkflow'
+_is_running = False
+_counting_status = 'Counting'
+_block_config_time = 5 * 60
+_trans_setup_time = 1 * 60
+_scatt_setup_time = 1 * 60
+_drive_sample_time = 20
 
 class WorkflowBlock():
     def __init__(self):
@@ -382,6 +388,7 @@ class WorkflowBlock():
         self.config = ctext
         self.table = gt
         self.new_block = cnew
+        self.is_running = False
         
     def update_title(self):
         self.group.name = str(self.title.value)
@@ -393,6 +400,7 @@ class WorkflowBlock():
         self.title.enabled = flag
         self.config.enabled = flag
         self.table.set_enabled(flag)
+        update_progress()
         
     def is_enabled(self):
         return self.enabled.value
@@ -418,6 +426,7 @@ class WorkflowBlock():
             self.remove.enabled = False
             self.config.enabled = False
             self.group.highlight = True
+            self.is_running = True
 #            self.new_block.enabled = False
             try:
                 slog('running configuration setup')
@@ -428,6 +437,7 @@ class WorkflowBlock():
                 self.group.highlight = False
                 self.remove.enabled = True
                 self.config.enabled = True
+                self.is_running = False
                 html = self.get_html()
                 if not html is None:
                     slog('upload scan result to notebook database')
@@ -479,6 +489,32 @@ class WorkflowBlock():
 #                return True
         return self.table.need_to_run()
     
+    def get_job_count(self):
+        if self.is_enabled():
+            return self.table.get_job_count()
+        else :
+            return 0
+        
+    def get_done_count(self):
+        if self.is_enabled():
+            return self.table.get_done_count()
+        else:
+            return 0
+        
+    def get_time_estimation(self):
+        global _block_config_time
+        if self.is_enabled():
+            t = self.table.get_time_estimation()
+            if t > 0 :
+                if len(self.config.value.strip()) > 0:
+                    return _block_config_time + t
+                else:
+                    return t
+            else:
+                return 0
+        else:
+            return 0
+        
     def reset_result(self):
         for i in self.table.samples:
             self.table.samples[i].reset_trans_result()
@@ -512,14 +548,14 @@ class Sample():
         s1_idx.width = 24
         s1_name = Par('string', '')
         s1_name.title = ''
-        s1_trans = Par('bool', True)
+        s1_trans = Par('bool', True, command = 'update_progress()')
         s1_trans.title = ''
         s1_trans_time = Par('float', __default_transmission_time__)
         s1_trans_time.title = ''
         s1_trans_time.width = 20
         s1_trans_res = Par('label', ' ' * 17)
         s1_trans_res.width = 100
-        s1_scatt = Par('bool', True)
+        s1_scatt = Par('bool', True, command = 'update_progress()')
         s1_scatt.title = ''
         s1_scatt_time = Par('float', __default_scattering_time__)
         s1_scatt_time.title = ''
@@ -546,24 +582,28 @@ class Sample():
         self.scatt_res.dispose()
         
     def run_transmission(self):
+        global _counting_status
         if self.do_trans.value and len(self.trans_res.value.strip()) == 0:
             slog('start transmission collect for sample number ' + str(self.idx))
-            self.trans_res.value = 'Counting'
+            self.trans_res.value = _counting_status
             self.trans_res.highlight = True
             try:
                 scan10(self.idx, self.trans_time.value, self.name_text.value)
                 self.trans_res.value = get_base_filename()
+                step_progress()
             finally:
                 self.trans_res.highlight = False
                 
     def run_scattering(self):
+        global _counting_status
         if self.do_scatt.value and len(self.scatt_res.value.strip()) == 0:
             slog('start scattering collect for sample number ' + str(self.idx))
-            self.scatt_res.value = 'Counting'
+            self.scatt_res.value = _counting_status
             self.scatt_res.highlight = True
             try:
                 scan10(self.idx, self.scatt_time.value, self.name_text.value)
                 self.scatt_res.value = get_base_filename()
+                step_progress()
             finally:
                 self.scatt_res.highlight = False
             
@@ -729,7 +769,45 @@ class SampleTable():
             if self.samples[i].need_to_run_scatt():
                 return True
         return False
+
+    def get_job_count(self):
+        ct = 0
+        for i in self.samples:
+            if self.samples[i].do_trans.value:
+                ct += 1
+            if self.samples[i].do_scatt.value:
+                ct += 1
+        return ct
+        
+    def get_done_count(self):
+        ct = 0
+        for i in self.samples:
+            if self.samples[i].do_trans.value and len(self.samples[i].trans_res.value.strip()) > 0:
+                ct += 1
+            if self.samples[i].do_scatt.value and len(self.samples[i].scatt_res.value.strip()) > 0:
+                ct += 1
+        return ct
     
+    def get_time_estimation(self):
+        global _trans_setup_time
+        global _scatt_setup_time
+        global _drive_sample_time
+        tt = 0
+        st = 0
+        for i in self.samples:
+            sp = self.samples[i]
+            if sp.do_trans.value and len(sp.trans_res.value.strip()) == 0:
+                tt += float(sp.trans_time.value) + _drive_sample_time
+            if sp.do_scatt.value and len(sp.scatt_res.value.strip()) == 0:
+                st += float(sp.scatt_time.value) + _drive_sample_time
+        if tt > 0:
+            if len(self.trans_setup.value.strip()) > 0 :
+                tt += _trans_setup_time
+        if st > 0:
+            if len(self.scatt_setup.value.strip()) > 0 :
+                st += _scatt_setup_time
+        return tt + st
+        
     def run_trans_setup(self):
         slog('collecting neutrons for transmission')
         ts = self.trans_setup.value
@@ -869,21 +947,25 @@ def change_trans_time(wid):
     wb = get_workflow_block(wid)
     if not wb is None:
         wb.table.update_trans_time()
+    update_time()
 
 def change_scatt_time(wid):
     wb = get_workflow_block(wid)
     if not wb is None:
         wb.table.update_scatt_time()
+    update_time()
             
 def toggle_trans_enabled(wid):
     wb = get_workflow_block(wid)
     if not wb is None:
         wb.table.toggle_trans_enabled()
+    update_progress()
 
 def toggle_scatt_enabled(wid):
     wb = get_workflow_block(wid)
     if not wb is None:
         wb.table.toggle_scatt_enabled()
+    update_progress()
         
 def remove_block(wid = None):
     if wid is None:
@@ -899,6 +981,7 @@ def remove_block(wid = None):
             wb.dispose()
             slog(tt)
             __UI__.updateUI()
+    update_progress()
 
 def insert_block(wid):
     global workflow_list
@@ -932,7 +1015,7 @@ def insert_block(wid):
             sample.do_scatt.value = old_sample.do_scatt.value
             sample.scatt_time.value = old_sample.scatt_time.value
         __UI__.updateUI()
-        
+    update_progress()
                 
 def add_block():
     global workflow_list
@@ -960,8 +1043,11 @@ def add_block():
     __UI__.updateUI()
 
 def run_scan():
+    global _is_running
     act_load.enabled = False
     act_run.enabled = False
+    _is_running = True
+    update_progress()
     try:
         slog('start Bilby workflow')
         for wb in workflow_list:
@@ -973,6 +1059,8 @@ def run_scan():
     finally:
         act_load.enabled = True
         act_run.enabled = True
+        _is_running = False
+        pro_bar.selection = 0
         export_report()
         
 def load_workflow():
@@ -997,6 +1085,7 @@ def load_workflow():
         for i in xrange(len(wl)):
             workflow_list[i].from_rep(wl[i])
     __UI__.updateUI()
+    update_time()
 
 def export_workflow():
     global workflow_list
@@ -1034,6 +1123,64 @@ def export_report():
     tree.write(fn)
     slog('Report XML created at ' + fn)
     
+def update_progress():
+    print 'updating progress'
+    update_time()
+    global _is_running
+    if not _is_running:
+        return
+    job_ct = 0
+    done_ct = 0
+    for wb in workflow_list:
+        if not wb.is_enabled():
+            continue
+        if wb.is_running:
+            done_ct = job_ct
+        job_ct += wb.get_job_count()
+        done_ct += wb.get_done_count()
+    pro_bar.max = job_ct
+    pro_bar.selection = done_ct
+    print 'job count is ' + str(job_ct)
+    print 'done count is ' + str(done_ct)
+    
+def step_progress():
+    pro_bar.selection = int(pro_bar.selection) + 1
+    print pro_bar.selection
+    
+def update_time():
+    if _is_running:
+        pass
+    else :
+        t = 0
+        for wb in workflow_list:
+            t += wb.get_time_estimation()
+        par_time.value = _get_tstring(t)
+        
+def _get_tstring(t):
+        if t == 0:
+            return ''
+        if t < 360:
+            return "%d seconds" % t
+        if t < 3600 * 2:
+            return "%d minutes" % round(t / 60)
+        if t < 3600 * 24:
+            rm = t % 3600
+            m = round(rm / 60)
+            h = t / 3600
+            if h >= 2 :
+                hs = 'hours'
+            else:
+                hs = 'hour'
+            if m > 0:
+                if m >= 2:
+                    ms = 'minutes'
+                else:
+                    ms = 'minute'
+                return ("%d " % h) + hs + ("%d " % m) + ms
+            else:
+                return ("%d " % h) + hs
+        return "%d hours" % round(t / 3600)
+    
 #def upload_html(wid):
 #    bl = get_workflow_block(wid)
 #    if not bl is None:
@@ -1041,6 +1188,13 @@ def export_report():
 #        if not html is None:
 #            n_logger.log_table(html)
     
+pro_bar = Par('progress', 0)
+pro_bar.max = 0
+pro_bar.selection = 0
+par_time = Par('string', '')
+par_time.title = 'Time Estimation'
+par_time.enabled = False
+
 act_load = Act('load_workflow()', 'Load Workflow')
 act_exp = Act('export_workflow()', 'Export Workflow')
 act_exp.independent = True
@@ -1057,6 +1211,7 @@ act_run = Act('run_scan()', 'Run Bilby Workflow')
 #add_block()
 workflow_list.append(WorkflowBlock())
 
+update_time()
 # Use below example to create a new Plot
 # Plot4 = Plot(title = 'new plot')
 
