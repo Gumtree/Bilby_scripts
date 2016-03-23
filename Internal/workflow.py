@@ -343,6 +343,7 @@ workflow_list = []
 __workflow_id__ = 0
 __report_folder__ = 'W:/data/current/reports/pWorkflow'
 _is_running = False
+_start_timestamp = 0
 _counting_status = 'Counting'
 _block_config_time = 5 * 60
 _trans_setup_time = 1 * 60
@@ -1245,9 +1246,11 @@ def add_block():
 
 def run_scan():
     global _is_running
+    global _start_timestamp
     act_load.enabled = False
     act_run.enabled = False
     _is_running = True
+    _start_timestamp = time.time()
     update_progress()
     try:
         slog('start Bilby workflow')
@@ -1261,10 +1264,11 @@ def run_scan():
         act_load.enabled = True
         act_run.enabled = True
         _is_running = False
+        _start_timestamp = 0
         pro_bar.selection = 0
         export_report()
         update_time()
-        sics.execute('hset /experiment/gumtree_time_estimate ' + str(ft))
+        sics.execute('hset /experiment/gumtree_time_estimate 0')
         
 def load_workflow():
     global workflow_list
@@ -1327,39 +1331,40 @@ def export_report():
     slog('Report XML created at ' + fn)
     
 def update_progress():
-    print 'updating progress'
+#    print 'updating progress'
     update_time()
-    global _is_running
-    if not _is_running:
-        return
-    job_ct = 0
-    done_ct = 0
-    for wb in workflow_list:
-        if not wb.is_enabled():
-            continue
-        if wb.is_running:
-            done_ct = job_ct
-        job_ct += wb.get_job_count()
-        done_ct += wb.get_done_count()
-    pro_bar.max = job_ct
-    pro_bar.selection = done_ct
-    print 'job count is ' + str(job_ct)
-    print 'done count is ' + str(done_ct)
+#    global _is_running
+#    if not _is_running:
+#        return
+#    job_ct = 0
+#    done_ct = 0
+#    for wb in workflow_list:
+#        if not wb.is_enabled():
+#            continue
+#        if wb.is_running:
+#            done_ct = job_ct
+#        job_ct += wb.get_job_count()
+#        done_ct += wb.get_done_count()
+#    pro_bar.max = job_ct
+#    pro_bar.selection = done_ct
+#    print 'job count is ' + str(job_ct)
+#    print 'done count is ' + str(done_ct)
     
 def step_progress():
-    pro_bar.selection = int(pro_bar.selection) + 1
+#    pro_bar.selection = int(pro_bar.selection) + 1
+    update_time()
     
 def update_time():
+    global _start_timestamp
     if _is_running:
         t = 0
         for wb in workflow_list:
             t += wb.get_time_estimation()
-        print 'time estimatino = ' + str(t)
+        slog('estimated time left: ' + str(int(t)) + 's')
 #        par_time.value = _get_tstring(t)
         ft = int(time.time() + t)
         sics.execute('hset /experiment/gumtree_time_estimate ' + str(ft))
         d = datetime.datetime.fromtimestamp(ft)
-        print d.day
         td = datetime.datetime.today()
         fs = 'to finish at '
         if t > 3600 * 24 :
@@ -1370,11 +1375,15 @@ def update_time():
             else:
                 fs += SimpleDateFormat("H:mm").format(d)
         par_time.value = fs
+        past = time.time() - _start_timestamp
+        pct = int(round(past / (past + t) * 100))
+        pro_bar.max = 100
+        pro_bar.selection = pct
     else :
         t = 0
         for wb in workflow_list:
             t += wb.get_time_estimation()
-        print 'time estimatino = ' + str(t)
+        slog('estimated time to run: ' + str(int(t)) + 's')
         par_time.value = _get_tstring(t)
         
 def _get_tstring(t):
