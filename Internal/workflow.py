@@ -1,5 +1,7 @@
 from gumpy.commons.logger import log
 import pickle
+import datetime
+from java.text import SimpleDateFormat
 import time
 from time import strftime, localtime
 from org.gumtree.gumnix.sics.control.events import DynamicControllerListenerAdapter
@@ -22,6 +24,7 @@ import traceback
 import socket
 from xml.etree.ElementTree import Element, SubElement, ElementTree, tostring
 from gumpy.commons.logger import n_logger
+from gumpy.lib import enum
 
 # Script control setup area
 # script info
@@ -363,6 +366,7 @@ class WorkflowBlock():
         cremove = Act('remove_block(' + str(self.wid) + ')', 'Remove This Block')
 #        cremove = Act('run1()', 'Remove This Block')
         cremove.name = 'cremove_' + str(self.wid)
+        cremove.independent = True
         globals()[str(cremove.name)] = cremove
         ctitle = Par('string', tt, command \
                      = 'update_title(' + str(self.wid) + ')')
@@ -389,6 +393,8 @@ class WorkflowBlock():
         self.table = gt
         self.new_block = cnew
         self.is_running = False
+        self.config_start_time = 0
+        self.config_stop_time = 0
         
     def update_title(self):
         self.group.name = str(self.title.value)
@@ -430,7 +436,12 @@ class WorkflowBlock():
 #            self.new_block.enabled = False
             try:
                 slog('running configuration setup')
-                exec(str(self.config.value))
+                self.config_stop_time = 0
+                self.config_start_time = time.time()
+                try:
+                    exec(str(self.config.value))
+                finally:
+                    self.config_stop_time = time.time()
                 self.table.run()
                 slog('block finished: ' + str(tt))
             finally:
@@ -503,22 +514,43 @@ class WorkflowBlock():
         
     def get_time_estimation(self):
         global _block_config_time
+        global _is_running
         if self.is_enabled():
-            t = self.table.get_time_estimation()
-            if t > 0 :
-                if len(self.config.value.strip()) > 0:
-                    return _block_config_time + t
+            if _is_running:
+                t = self.table.get_time_estimation()
+                if t > 0 :
+                    if len(self.config.value.strip()) > 0:
+                        if self.config_stop_time != 0:
+                            return t
+                        else:
+                            if self.config_start_time != 0:
+                                past = time.time() - self.config_start_time
+                                if past > _block_config_time :
+                                    return t
+                                else :
+                                    return _block_config_time - past + t
+                            else:
+                                return _block_config_time + t
+                    else:
+                        return t
                 else:
-                    return t
+                    return 0
             else:
-                return 0
+                t = self.table.get_time_estimation()
+                if t > 0 :
+                    if len(self.config.value.strip()) > 0:
+                        return _block_config_time + t
+                    else:
+                        return t
+                else:
+                    return 0
         else:
             return 0
         
     def reset_result(self):
-        for i in self.table.samples:
-            self.table.samples[i].reset_trans_result()
-            self.table.samples[i].reset_scatt_result()
+        self.config_start_time = 0
+        self.config_stop_time = 0
+        self.table.reset_result()
             
     def append_xml(self, parent):
         if self.enabled.value:
@@ -570,6 +602,10 @@ class Sample():
         self.do_scatt = s1_scatt
         self.scatt_time = s1_scatt_time
         self.scatt_res = s1_scatt_res
+        self.trans_start_time = 0
+        self.trans_stop_time = 0
+        self.scatt_start_time = 0
+        self.scatt_stop_time = 0
         
     def dispose(self):
         self.id_label.dispose()
@@ -586,6 +622,8 @@ class Sample():
         if self.do_trans.value and len(self.trans_res.value.strip()) == 0:
             slog('start transmission collect for sample number ' + str(self.idx))
             self.trans_res.value = _counting_status
+            self.trans_stop_time = 0
+            self.trans_start_time = time.time()
             self.trans_res.highlight = True
             try:
                 scan10(self.idx, self.trans_time.value, self.name_text.value)
@@ -593,12 +631,15 @@ class Sample():
                 step_progress()
             finally:
                 self.trans_res.highlight = False
+                self.trans_stop_time = time.time()
                 
     def run_scattering(self):
         global _counting_status
         if self.do_scatt.value and len(self.scatt_res.value.strip()) == 0:
             slog('start scattering collect for sample number ' + str(self.idx))
             self.scatt_res.value = _counting_status
+            self.scatt_stop_time = 0
+            self.scatt_start_time = time.time()
             self.scatt_res.highlight = True
             try:
                 scan10(self.idx, self.scatt_time.value, self.name_text.value)
@@ -606,6 +647,7 @@ class Sample():
                 step_progress()
             finally:
                 self.scatt_res.highlight = False
+                self.scatt_stop_time = time.time()
             
     def set_enabled(self, flag):
         self.id_label.enabled = flag
@@ -622,9 +664,64 @@ class Sample():
     
     def reset_trans_result(self):
         self.trans_res.value = ''
+        self.trans_start_time = 0
+        self.trans_stop_time = 0
         
     def reset_scatt_result(self):
         self.scatt_res.value = ''
+        self.scatt_start_time = 0
+        self.scatt_stop_time = 0
+        
+    def get_trans_time_estimation(self):
+        global _drive_sample_time
+        global _is_running
+        if _is_running:
+            if self.trans_start_time != 0:
+                if self.trans_stop_time == 0 :
+                    past = time.time() - self.trans_start_time
+                    est = float(self.trans_time.value) + _drive_sample_time
+                    if past > est :
+                        return 0
+                    else:
+                        return est - past
+                else:
+                    return 0
+            else:
+                if self.do_trans.value:
+                    return float(self.trans_time.value) + _drive_sample_time
+                else:
+                    return 0
+        else:
+            if self.do_trans.value :
+                return float(self.trans_time.value) + _drive_sample_time
+            else:
+                return 0
+
+
+    def get_scatt_time_estimation(self):
+        global _drive_sample_time
+        global _is_running
+        if _is_running:
+            if self.scatt_start_time != 0:
+                if self.scatt_stop_time == 0 :
+                    past = time.time() - self.scatt_start_time
+                    est = float(self.scatt_time.value) + _drive_sample_time
+                    if past > est :
+                        return 0
+                    else:
+                        return est - past
+                else:
+                    return 0
+            else:
+                if self.do_scatt.value:
+                    return float(self.scatt_time.value) + _drive_sample_time
+                else:
+                    return 0
+        else:
+            if self.do_scatt.value :
+                return float(self.scatt_time.value) + _drive_sample_time
+            else:
+                return 0
         
     def need_to_run_trans(self):
         return self.do_trans.value and len(self.trans_res.value.strip()) == 0
@@ -723,6 +820,14 @@ class SampleTable():
                        tit_4, tit_5, tit_6)
         for i in xrange(__number_of_sample__) :
             self.add_sample(i + 1)
+        self.trans_config_start_time = 0
+        self.trans_config_stop_time = 0
+        self.scatt_config_start_time = 0
+        self.scatt_config_stop_time = 0
+        self.trans_start_time = 0
+        self.trans_stop_time = 0
+        self.scatt_start_time = 0
+        self.scatt_stop_time = 0
         
     def add_sample(self, id):
         sample = Sample(id)
@@ -792,33 +897,107 @@ class SampleTable():
         global _trans_setup_time
         global _scatt_setup_time
         global _drive_sample_time
-        tt = 0
-        st = 0
-        for i in self.samples:
-            sp = self.samples[i]
-            if sp.do_trans.value and len(sp.trans_res.value.strip()) == 0:
-                tt += float(sp.trans_time.value) + _drive_sample_time
-            if sp.do_scatt.value and len(sp.scatt_res.value.strip()) == 0:
-                st += float(sp.scatt_time.value) + _drive_sample_time
-        if tt > 0:
-            if len(self.trans_setup.value.strip()) > 0 :
-                tt += _trans_setup_time
-        if st > 0:
-            if len(self.scatt_setup.value.strip()) > 0 :
-                st += _scatt_setup_time
-        return tt + st
+        global _is_running
+        
+        if _is_running :
+            t = 0
+            if self.trans_config_start_time != 0 and self.trans_config_stop_time == 0:
+                past = time.time() - self.trans_config_start_time
+                if past < _trans_setup_time :
+                    t += _trans_setup_time - past
+                else:
+                    pass
+                for i in self.samples:
+                    t += self.samples[i].get_trans_time_estimation()
+                if self.need_to_run_scatt():
+                    if len(self.scatt_setup.value.strip()) > 0 :
+                        t += _scatt_setup_time
+                    for i in self.samples:
+                        t += self.samples[i].get_scatt_time_estimation()
+                else:
+                    pass
+            elif self.trans_start_time != 0 and self.trans_stop_time == 0:
+                for i in self.samples:
+                    t += self.samples[i].get_trans_time_estimation()
+                if self.need_to_run_scatt():
+                    if len(self.scatt_setup.value.strip()) > 0 :
+                        t += _scatt_setup_time
+                    for i in self.samples:
+                        t += self.samples[i].get_scatt_time_estimation()
+                else:
+                    pass
+            elif self.scatt_config_start_time != 0 and self.scatt_config_stop_time == 0:
+                past = time.time() - self.scatt_config_start_time
+                if past < _scatt_setup_time :
+                    t += _scatt_setup_time - past
+                else:
+                    pass
+                for i in self.samples:
+                    t += self.samples[i].get_scatt_time_estimation()
+                if self.need_to_run_trans():
+                    if len(self.trans_setup.value.strip()) > 0 :
+                        t += _trans_setup_time
+                    for i in self.samples:
+                        t += self.samples[i].get_trans_time_estimation()
+                else:
+                    pass
+            elif self.scatt_start_time != 0 and self.scatt_stop_time == 0:
+                for i in self.samples:
+                    t += self.samples[i].get_scatt_time_estimation()
+                if self.need_to_run_trans():
+                    if len(self.trans_setup.value.strip()) > 0 :
+                        t += _trans_setup_time
+                    for i in self.samples:
+                        t += self.samples[i].get_trans_time_estimation()
+                else:
+                    pass
+            else:
+                if self.need_to_run_scatt() :
+                    if len(self.scatt_setup.value.strip()) > 0 :
+                        t += _scatt_setup_time
+                    for i in self.samples:
+                        t += self.samples[i].get_scatt_time_estimation()
+                if self.need_to_run_trans():
+                    if len(self.trans_setup.value.strip()) > 0 :
+                        t += _trans_setup_time
+                    for i in self.samples:
+                        t += self.samples[i].get_trans_time_estimation()
+            return t
+        else:
+            tt = 0
+            st = 0
+            for i in self.samples:
+                tt += self.samples[i].get_trans_time_estimation()
+                st += self.samples[i].get_scatt_time_estimation()
+            if tt > 0:
+                if len(self.trans_setup.value.strip()) > 0 :
+                    tt += _trans_setup_time
+            if st > 0:
+                if len(self.scatt_setup.value.strip()) > 0 :
+                    st += _scatt_setup_time
+            return tt + st
         
     def run_trans_setup(self):
         slog('collecting neutrons for transmission')
         ts = self.trans_setup.value
         if ts != None and len(ts.strip()) > 0:
             slog('running transmission setup ' + str(ts).strip().replace('\r\n', ' + '))
-            exec(str(ts))
+            self.trans_config_stop_time = 0
+            self.trans_config_start_time = time.time()
+            try:
+                exec(str(ts))
+            finally:
+                self.trans_config_stop_time = time.time()
         
     def run_trans(self):
         if self.need_to_run_trans():
-            for i in sorted(self.samples):
-                self.samples[i].run_transmission()
+            self.trans_stop_time = 0
+            self.trans_start_time = time.time()
+            try:
+                for i in sorted(self.samples):
+                    self.samples[i].run_transmission()
+            finally:
+                self.trans_stop_time = time.time()
             self.run_trans()
 
     def run_scatt_setup(self):
@@ -826,15 +1005,37 @@ class SampleTable():
         ss = self.scatt_setup.value
         if ss != None and len(ss.strip()) > 0:
             slog('running scattering setup ' + str(ss).strip().replace('\r\n', ' + '))
-            exec(str(ss))
+            self.scatt_config_stop_time = 0
+            self.scatt_config_start_time = time.time()
+            try:
+                exec(str(ss))
+            finally:
+                self.scatt_config_stop_time = time.time()
         
     def run_scatt(self):
         if self.need_to_run_scatt():
-            for i in sorted(self.samples):
-                self.samples[i].run_scattering()
+            self.scatt_stop_time = 0
+            self.scatt_start_time = time.time()
+            try:
+                for i in sorted(self.samples):
+                    self.samples[i].run_scattering()
+            finally:
+                self.scatt_stop_time = time.time()
             self.run_scatt()
 
-    
+    def reset_result(self):
+        self.trans_config_start_time = 0
+        self.trans_config_stop_time = 0
+        self.scatt_config_start_time = 0
+        self.scatt_config_stop_time = 0
+        self.trans_start_time = 0
+        self.trans_stop_time = 0
+        self.scatt_start_time = 0
+        self.scatt_stop_time = 0
+        for i in self.samples:
+            self.samples[i].reset_trans_result()
+            self.samples[i].reset_scatt_result()
+        
     def set_enabled(self, flag):
         self.t1.enabled = flag
         self.t2.enabled = flag
@@ -1062,6 +1263,8 @@ def run_scan():
         _is_running = False
         pro_bar.selection = 0
         export_report()
+        update_time()
+        sics.execute('hset /experiment/gumtree_time_estimate ' + str(ft))
         
 def load_workflow():
     global workflow_list
@@ -1145,15 +1348,33 @@ def update_progress():
     
 def step_progress():
     pro_bar.selection = int(pro_bar.selection) + 1
-    print pro_bar.selection
     
 def update_time():
     if _is_running:
-        pass
+        t = 0
+        for wb in workflow_list:
+            t += wb.get_time_estimation()
+        print 'time estimatino = ' + str(t)
+#        par_time.value = _get_tstring(t)
+        ft = int(time.time() + t)
+        sics.execute('hset /experiment/gumtree_time_estimate ' + str(ft))
+        d = datetime.datetime.fromtimestamp(ft)
+        print d.day
+        td = datetime.datetime.today()
+        fs = 'to finish at '
+        if t > 3600 * 24 :
+            fs += SimpleDateFormat("H:mm dd/M").format(d)
+        else:
+            if d.day != td.day :
+                fs += SimpleDateFormat("H:mm ").format(d) + 'tomorrow'
+            else:
+                fs += SimpleDateFormat("H:mm").format(d)
+        par_time.value = fs
     else :
         t = 0
         for wb in workflow_list:
             t += wb.get_time_estimation()
+        print 'time estimatino = ' + str(t)
         par_time.value = _get_tstring(t)
         
 def _get_tstring(t):
