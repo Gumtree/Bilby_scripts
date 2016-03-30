@@ -1172,18 +1172,23 @@ def toggle_scatt_enabled(wid):
 def remove_block(wid = None):
     if wid is None:
         if len(workflow_list) > 0:
-            rmv = workflow_list.pop()
-            rmv.dispose()
-            __UI__.updateUI()
+            try:
+                rmv = workflow_list.pop()
+                rmv.dispose()
+            finally:
+                __UI__.updateUI()
+                update_progress()
     else:
         wb = get_workflow_block(wid)
         if not wb is None:
             tt = 'Block ' + wb.title.value + ' removed'
-            workflow_list.remove(wb)
-            wb.dispose()
-            slog(tt)
-            __UI__.updateUI()
-    update_progress()
+            try:
+                workflow_list.remove(wb)
+                wb.dispose()
+                slog(tt)
+            finally:
+                __UI__.updateUI()
+                update_progress()
 
 def insert_block(wid):
     global workflow_list
@@ -1200,23 +1205,25 @@ def insert_block(wid):
     else:
         wb = WorkflowBlock()
         workflow_list.insert(idx + 1, wb)
-        wb.group.moveAfterObject(old.group)
-        wb.config.value = old.config.value
-        wb.table.t3.value = old.table.t3.value
-        wb.table.t5.value = old.table.t5.value
-        wb.table.trans_time.value = old.table.trans_time.value
-        wb.table.scatt_time.value = old.table.scatt_time.value
-        wb.table.trans_setup.value = old.table.trans_setup.value
-        wb.table.scatt_setup.value = old.table.scatt_setup.value
-        for i in wb.table.samples:
-            sample = wb.table.samples[i]
-            old_sample = old.table.samples[i]
-            sample.name_text.value = old_sample.name_text.value
-            sample.do_trans.value = old_sample.do_trans.value
-            sample.trans_time.value = old_sample.trans_time.value
-            sample.do_scatt.value = old_sample.do_scatt.value
-            sample.scatt_time.value = old_sample.scatt_time.value
-        __UI__.updateUI()
+        try:
+            wb.group.moveAfterObject(old.group)
+            wb.config.value = old.config.value
+            wb.table.t3.value = old.table.t3.value
+            wb.table.t5.value = old.table.t5.value
+            wb.table.trans_time.value = old.table.trans_time.value
+            wb.table.scatt_time.value = old.table.scatt_time.value
+            wb.table.trans_setup.value = old.table.trans_setup.value
+            wb.table.scatt_setup.value = old.table.scatt_setup.value
+            for i in wb.table.samples:
+                sample = wb.table.samples[i]
+                old_sample = old.table.samples[i]
+                sample.name_text.value = old_sample.name_text.value
+                sample.do_trans.value = old_sample.do_trans.value
+                sample.trans_time.value = old_sample.trans_time.value
+                sample.do_scatt.value = old_sample.do_scatt.value
+                sample.scatt_time.value = old_sample.scatt_time.value
+        finally:
+            __UI__.updateUI()
     update_progress()
                 
 def add_block():
@@ -1226,23 +1233,25 @@ def add_block():
         old = workflow_list[-1]
     wb = WorkflowBlock()
     workflow_list.append(wb)
-    if not old is None:
-        wb.config.value = old.config.value
-        wb.table.t3.value = old.table.t3.value
-        wb.table.t5.value = old.table.t5.value
-        wb.table.trans_time.value = old.table.trans_time.value
-        wb.table.scatt_time.value = old.table.scatt_time.value
-        wb.table.trans_setup.value = old.table.trans_setup.value
-        wb.table.scatt_setup.value = old.table.scatt_setup.value
-        for i in wb.table.samples:
-            sample = wb.table.samples[i]
-            old_sample = old.table.samples[i]
-            sample.name_text.value = old_sample.name_text.value
-            sample.do_trans.value = old_sample.do_trans.value
-            sample.trans_time.value = old_sample.trans_time.value
-            sample.do_scatt.value = old_sample.do_scatt.value
-            sample.scatt_time.value = old_sample.scatt_time.value
-    __UI__.updateUI()
+    try:
+        if not old is None:
+            wb.config.value = old.config.value
+            wb.table.t3.value = old.table.t3.value
+            wb.table.t5.value = old.table.t5.value
+            wb.table.trans_time.value = old.table.trans_time.value
+            wb.table.scatt_time.value = old.table.scatt_time.value
+            wb.table.trans_setup.value = old.table.trans_setup.value
+            wb.table.scatt_setup.value = old.table.scatt_setup.value
+            for i in wb.table.samples:
+                sample = wb.table.samples[i]
+                old_sample = old.table.samples[i]
+                sample.name_text.value = old_sample.name_text.value
+                sample.do_trans.value = old_sample.do_trans.value
+                sample.trans_time.value = old_sample.trans_time.value
+                sample.do_scatt.value = old_sample.do_scatt.value
+                sample.scatt_time.value = old_sample.scatt_time.value
+    finally:
+        __UI__.updateUI()
 
 def run_scan():
     global _is_running
@@ -1251,11 +1260,11 @@ def run_scan():
     act_run.enabled = False
     _is_running = True
     _start_timestamp = time.time()
-    update_progress()
     try:
         slog('start Bilby workflow')
         for wb in workflow_list:
             wb.reset_result()
+        update_progress()
         for wb in workflow_list:
             if wb.is_enabled() :
                 wb.run()
@@ -1281,18 +1290,20 @@ def load_workflow():
         wl = pickle.load(file)
     finally:
         file.close()
-    if not wl is None and len(wl) > 0:
-        if len(wl) > len(workflow_list) :
-            for i in xrange(len(wl) - len(workflow_list)):
-                workflow_list.append(WorkflowBlock())
-        elif len(wl) < len(workflow_list) :
-            for i in xrange(len(workflow_list) - len(wl)):
-                rmv = workflow_list.pop()
-                rmv.dispose()
-        for i in xrange(len(wl)):
-            workflow_list[i].from_rep(wl[i])
-    __UI__.updateUI()
-    update_time()
+    try:
+        if not wl is None and len(wl) > 0:
+            if len(wl) > len(workflow_list) :
+                for i in xrange(len(wl) - len(workflow_list)):
+                    workflow_list.append(WorkflowBlock())
+            elif len(wl) < len(workflow_list) :
+                for i in xrange(len(workflow_list) - len(wl)):
+                    rmv = workflow_list.pop()
+                    rmv.dispose()
+            for i in xrange(len(wl)):
+                workflow_list[i].from_rep(wl[i])
+    finally:
+        __UI__.updateUI()
+        update_time()
 
 def export_workflow():
     global workflow_list
