@@ -281,6 +281,8 @@ except:
 __batch_status_listener__ = BatchStatusListener()
 sics.SicsCore.getSicsManager().proxy().addProxyListener(__batch_status_listener__)
 
+def __dataset_added__(fns = None):
+    pass
 
 class SICSConsoleEventHandler(ConsoleEventHandler):
     
