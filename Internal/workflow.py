@@ -585,14 +585,14 @@ class Sample():
         s1_name.title = ''
         s1_trans = Par('bool', True, command = 'update_progress()')
         s1_trans.title = ''
-        s1_trans_time = Par('float', __default_transmission_time__)
+        s1_trans_time = Par('float', __default_transmission_time__, command = 'update_progress()')
         s1_trans_time.title = ''
         s1_trans_time.width = 20
         s1_trans_res = Par('label', ' ' * 17)
         s1_trans_res.width = 100
         s1_scatt = Par('bool', True, command = 'update_progress()')
         s1_scatt.title = ''
-        s1_scatt_time = Par('float', __default_scattering_time__)
+        s1_scatt_time = Par('float', __default_scattering_time__, command = 'update_progress()')
         s1_scatt_time.title = ''
         s1_scatt_time.width = 20
         s1_scatt_res = Par('label', ' ' * 17)
