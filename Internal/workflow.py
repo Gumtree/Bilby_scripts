@@ -1263,6 +1263,14 @@ def run_scan():
     _is_running = True
     _start_timestamp = time.time()
     try:
+        path = get_project_path('scripts') + '/gumtree_autosave'
+        if not os.path.exists(path):
+            os.makedirs(path)
+        path += '/workflow_' + strftime("%Y-%m-%dT%H-%M-%S", localtime()) + '.pkl'
+        export_workflow(path)
+    except:
+        slog('faied to auto save')
+    try:
         slog('start Bilby workflow')
         for wb in workflow_list:
             wb.reset_result()
@@ -1307,11 +1315,12 @@ def load_workflow():
         __UI__.updateUI()
         update_time()
 
-def export_workflow():
+def export_workflow(path = None):
     global workflow_list
-    path = selectSaveFile(['*.pkl'])
-    if path == None:
-        return
+    if path is None:
+        path = selectSaveFile(['*.pkl'])
+        if path == None:
+            return
     if not path.lower().endswith('.pkl') :
         path += '.pkl'
     fi = File(path)
