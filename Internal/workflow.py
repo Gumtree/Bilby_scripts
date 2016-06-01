@@ -34,7 +34,7 @@ __script__.version = '1.0'
 sics.ready = False
 
 __data_folder__ = 'W:/data/current'
-#__data_folder__ = 'Z:/testing/pelican'
+#__data_folder__ = 'Y:/testing/bilby/sicsdata'
 __export_folder__ = 'W:/data/current/reports'
 __buffer_log_file__ = __export_folder__
 Dataset.__dicpath__ = get_absolute_path('/Internal/path_table')
@@ -589,14 +589,14 @@ class Sample():
         s1_trans_time.title = ''
         s1_trans_time.width = 20
         s1_trans_res = Par('label', ' ' * 17)
-        s1_trans_res.width = 100
+        s1_trans_res.width = 120
         s1_scatt = Par('bool', True, command = 'update_progress()')
         s1_scatt.title = ''
         s1_scatt_time = Par('float', __default_scattering_time__, command = 'update_progress()')
         s1_scatt_time.title = ''
         s1_scatt_time.width = 20
         s1_scatt_res = Par('label', ' ' * 17)
-        s1_scatt_res.width = 100
+        s1_scatt_res.width = 120
         self.id_label = s1_idx
         self.name_text = s1_name
         self.do_trans = s1_trans
@@ -609,6 +609,8 @@ class Sample():
         self.trans_stop_time = 0
         self.scatt_start_time = 0
         self.scatt_stop_time = 0
+        self.actual_trans_time = 0
+        self.actual_scatt_time = 0
         
     def dispose(self):
         self.id_label.dispose()
@@ -632,8 +634,22 @@ class Sample():
                 scan10(self.idx, self.trans_time.value, self.name_text.value)
                 self.trans_res.value = get_base_filename()
                 step_progress()
-            finally:
                 self.trans_res.highlight = False
+            except Exception, e:
+                sics.execute('newfile HISTOGRAM_XYT')
+                sics.execute('save')
+                time.sleep(1)
+                fn = get_base_filename()
+                self.trans_res.value = '*' + fn
+                try:
+                    at = sics.get_stable_value('/instrument/detector/time').getFloatData()
+                    self.actual_trans_time = at
+                    slog('actual collecting time of ' + fn + ' is %.1f s' % at)
+                except:
+                    pass
+                raise e
+            finally:
+#                self.trans_res.highlight = False
                 self.trans_stop_time = time.time()
                 
     def run_scattering(self):
@@ -648,8 +664,22 @@ class Sample():
                 scan10(self.idx, self.scatt_time.value, self.name_text.value)
                 self.scatt_res.value = get_base_filename()
                 step_progress()
-            finally:
                 self.scatt_res.highlight = False
+            except Exception, e:
+                sics.execute('newfile HISTOGRAM_XYT')
+                sics.execute('save')
+                time.sleep(1)
+                fn = get_base_filename()
+                self.scatt_res.value = '*' + fn
+                try:
+                    at = sics.get_stable_value('/instrument/detector/time').getFloatData()
+                    self.actual_scatt_time = at
+                    slog('actual collecting time of ' + fn + ' is %.1f s' % at)
+                except:
+                    pass
+                raise e
+            finally:
+#                self.scatt_res.highlight = False
                 self.scatt_stop_time = time.time()
             
     def set_enabled(self, flag):
@@ -741,6 +771,14 @@ class Sample():
             trans.text = self.trans_res.value.strip()
             scatt = SubElement(sp, 'scattering')
             scatt.text = self.scatt_res.value.strip()
+            text = ''
+            if self.actual_trans_time != 0:
+                text += 'actual transmission time is %.1f s' % self.actual_trans_time
+            if self.actual_scatt_time != 0:
+                text += 'actual scattering time is %.1f s' % self.actual_scatt_time
+            if text != '' :
+                commt = SubElement(sp, 'comment')
+                commt.text = text
         
     def get_html_elmt(self):
         if len(self.trans_res.value.strip()) > 0 or len(self.scatt_res.value.strip()) > 0:
@@ -750,12 +788,30 @@ class Sample():
             td = SubElement(tr, 'td')
             td.text = str(self.name_text.value.strip())
             td = SubElement(tr, 'td')
-            td.text = get_short_pdfname(self.trans_res.value.strip())
+            text = get_short_pdfname(self.trans_res.value.strip())
+            if text.startswith('*'):
+                font = SubElement(td, 'font')
+                font.set('color', 'red')
+                font.text = text
+            else:
+                td.text = text
             td = SubElement(tr, 'td')
-            td.text = get_short_pdfname(self.scatt_res.value.strip())
+            text = get_short_pdfname(self.scatt_res.value.strip())
+            if text.startswith('*'):
+                font = SubElement(td, 'font')
+                font.set('color', 'red')
+                font.text = text
+            else:
+                td.text = text
             td = SubElement(tr, 'td')
             td.text = str(self.scatt_time.value)
             td = SubElement(tr, 'td')
+            text = ''
+            if self.actual_trans_time != 0:
+                text += 'trans-time = %.1f s' % self.actual_trans_time
+            if self.actual_scatt_time != 0:
+                text += 'scatt-time = %.1f s' % self.actual_scatt_time
+            td.text = text 
             return tr
         return None
         
@@ -1279,6 +1335,10 @@ def run_scan():
             if wb.is_enabled() :
                 wb.run()
         slog('workflow is finished')
+    except Exception, e:
+        msg = traceback.format_exc()
+        logBook(msg)
+        raise e
     finally:
         act_load.enabled = True
         act_run.enabled = True
