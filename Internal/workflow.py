@@ -90,7 +90,7 @@ def add_dataset():
     global __DATASOURCE__
     try:
 #        __DATASOURCE__.addDataset(__file_to_add__, True)
-        slog('adding' + str(__file_to_add__))
+        slog('adding ' + str(__file_to_add__))
     except:
         slog( 'error in adding dataset: ' + __file_to_add__ )
         
@@ -152,8 +152,10 @@ def add_dataset():
             sock.close()
 
     except:
+        msg = traceback.format_exc()
+        logBook(msg)
         traceback.print_exc(file=sys.stdout)
-        slog( 'failed to create tar file for ' + __file_to_add__ )
+#        slog( 'failed to create tar file for ' + __file_to_add__ )
     finally:
         df.datasets.clear()
 
