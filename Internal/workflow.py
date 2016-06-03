@@ -4,6 +4,7 @@ import datetime
 from java.text import SimpleDateFormat
 import time
 from time import strftime, localtime, sleep, sleep as wait
+from org.gumtree.gumnix.sics.core import SicsCore
 from org.gumtree.gumnix.sics.control.events import DynamicControllerListenerAdapter
 from org.gumtree.gumnix.sics.control import IStateMonitorListener
 from org.gumtree.gumnix.sics.io import SicsProxyListenerAdapter
@@ -647,24 +648,32 @@ class Sample():
                 step_progress()
                 self.trans_res.highlight = False
             except :
-                slog('exception caught, now saving collected data')
-                sics.execute('newfile HISTOGRAM_XYT')
-                sics.execute('save')
-                time.sleep(1)
-                fn = get_base_filename()
-                self.trans_res.value = '*' + fn
                 try:
-                    at = sics.get_stable_value('/instrument/detector/time').getFloatData()
-                    self.actual_trans_time = at
-                    slog('actual collecting time of ' + fn + ' is %.1f s' % at)
-                except:
-                    pass
-                raise 
+                    detector_start = sics.get_stable_value('/instrument/detector/start_time').getIntData()
+                    if detector_start > self.trans_start_time :
+                        slog('exception caught, now saving collected data')
+                        sics.execute('newfile HISTOGRAM_XYT')
+                        sics.execute('save')
+                        time.sleep(1)
+                        fn = get_base_filename()
+                        self.trans_res.value = '*' + fn
+                        try:
+                            at = sics.get_stable_value('/instrument/detector/time').getFloatData()
+                            self.actual_trans_time = at
+                            slog('actual collecting time of ' + fn + ' is %.1f s' % at)
+                        except:
+                            pass
+                    else:
+                        self.trans_res.value = ''
+                        slog('counting has not started, no data is available.')
+                finally:
+                    raise
             finally:
 #                self.trans_res.highlight = False
                 act_next.enabled = False
                 act_pause.enabled = False
                 if __is_collection_interrupted__:
+                    __is_collection_interrupted__ = False
                     fn = self.trans_res.value
                     self.trans_res.value = '*' + fn
                     self.trans_res.highlight = True
@@ -675,7 +684,6 @@ class Sample():
                     except:
                         traceback.print_exc(file=sys.stdout)
                         slog('error reading detector time')
-                    __is_collection_interrupted__ = False
                 self.trans_stop_time = time.time()
             slog('transmission collection is finished for sample number ' + str(self.idx))
                 
@@ -698,22 +706,31 @@ class Sample():
                 step_progress()
                 self.scatt_res.highlight = False
             except :
-                sics.execute('newfile HISTOGRAM_XYT')
-                sics.execute('save')
-                time.sleep(1)
-                fn = get_base_filename()
-                self.scatt_res.value = '*' + fn
                 try:
-                    at = sics.get_stable_value('/instrument/detector/time').getFloatData()
-                    self.actual_scatt_time = at
-                    slog('actual collecting time of ' + fn + ' is %.1f s' % at)
-                except:
-                    pass
-                raise
+                    detector_start = sics.get_stable_value('/instrument/detector/start_time').getIntData()
+                    if detector_start > self.scatt_start_time :
+                        slog('exception caught, now saving collected data')
+                        sics.execute('newfile HISTOGRAM_XYT')
+                        sics.execute('save')
+                        time.sleep(1)
+                        fn = get_base_filename()
+                        self.scatt_res.value = '*' + fn
+                        try:
+                            at = sics.get_stable_value('/instrument/detector/time').getFloatData()
+                            self.actual_scatt_time = at
+                            slog('actual collecting time of ' + fn + ' is %.1f s' % at)
+                        except:
+                            pass
+                    else :
+                        self.scatt_res.value = ''
+                        slog('counting has not started, no data is available.')
+                finally:
+                    raise
             finally:
                 act_next.enabled = False
                 act_pause.enabled = False
                 if __is_collection_interrupted__:
+                    __is_collection_interrupted__ = False              
                     fn = self.scatt_res.value
                     self.scatt_res.value = '*' + fn
                     self.scatt_res.highlight = True
@@ -724,7 +741,6 @@ class Sample():
                     except:
                         traceback.print_exc(file=sys.stdout)
                         slog('error reading detector time')
-                    __is_collection_interrupted__ = False              
 #                self.scatt_res.highlight = False
                 self.scatt_stop_time = time.time()
             slog('scattering collection is finished for sample number ' + str(self.idx))
@@ -1579,9 +1595,13 @@ def pause_workflow():
         act_pause.selected = False
     
 def stop_workflow():
+    global __is_collection_interrupted__
     slog('send interrupt signal')
-    from org.gumtree.gumnix.sics.core import SicsCore
 #    sics.getSicsController().interrupt()
+    status = sics.getStatus()
+    if not status is None and status.upper() == 'COUNTING':
+        slog('interrupt counting')
+        __is_collection_interrupted__ = True
     SicsCore.getSicsController().interrupt()
     
 __is_collection_interrupted__ = False
