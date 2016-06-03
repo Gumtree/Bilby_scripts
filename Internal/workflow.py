@@ -3,7 +3,7 @@ import pickle
 import datetime
 from java.text import SimpleDateFormat
 import time
-from time import strftime, localtime
+from time import strftime, localtime, sleep, sleep as wait
 from org.gumtree.gumnix.sics.control.events import DynamicControllerListenerAdapter
 from org.gumtree.gumnix.sics.control import IStateMonitorListener
 from org.gumtree.gumnix.sics.io import SicsProxyListenerAdapter
@@ -450,6 +450,7 @@ class WorkflowBlock():
                     exec(str(self.config.value))
                 finally:
                     self.config_stop_time = time.time()
+                slog('configuration setup is finished')
                 self.table.run()
                 slog('block finished: ' + str(tt))
             finally:
@@ -629,18 +630,24 @@ class Sample():
         
     def run_transmission(self):
         global _counting_status
+        global __is_collection_interrupted__
         if self.do_trans.value and len(self.trans_res.value.strip()) == 0:
-            slog('start transmission collect for sample number ' + str(self.idx))
+            slog('start transmission collection for sample number ' + str(self.idx))
+            if len(str(self.name_text.value)) > 0:
+                slog('transmission: ' + str(self.name_text.value))
             self.trans_res.value = _counting_status
             self.trans_stop_time = 0
             self.trans_start_time = time.time()
             self.trans_res.highlight = True
             try:
+                act_next.enabled = True
+                act_pause.enabled = True
                 scan10(self.idx, self.trans_time.value, self.name_text.value)
                 self.trans_res.value = get_base_filename()
                 step_progress()
                 self.trans_res.highlight = False
-            except Exception, e:
+            except :
+                slog('exception caught, now saving collected data')
                 sics.execute('newfile HISTOGRAM_XYT')
                 sics.execute('save')
                 time.sleep(1)
@@ -652,25 +659,45 @@ class Sample():
                     slog('actual collecting time of ' + fn + ' is %.1f s' % at)
                 except:
                     pass
-                raise e
+                raise 
             finally:
 #                self.trans_res.highlight = False
+                act_next.enabled = False
+                act_pause.enabled = False
+                if __is_collection_interrupted__:
+                    fn = self.trans_res.value
+                    self.trans_res.value = '*' + fn
+                    self.trans_res.highlight = True
+                    try:
+                        at = sics.get_stable_value('/instrument/detector/time').getFloatData()
+                        self.actual_trans_time = at
+                        slog('actual collecting time of ' + fn + ' is %.1f s' % at)
+                    except:
+                        traceback.print_exc(file=sys.stdout)
+                        slog('error reading detector time')
+                    __is_collection_interrupted__ = False
                 self.trans_stop_time = time.time()
+            slog('transmission collection is finished for sample number ' + str(self.idx))
                 
     def run_scattering(self):
         global _counting_status
+        global __is_collection_interrupted__
         if self.do_scatt.value and len(self.scatt_res.value.strip()) == 0:
-            slog('start scattering collect for sample number ' + str(self.idx))
+            slog('start scattering collection for sample number ' + str(self.idx))
+            if len(str(self.name_text.value)) > 0:
+                slog('scattering: ' + str(self.name_text.value))
             self.scatt_res.value = _counting_status
             self.scatt_stop_time = 0
             self.scatt_start_time = time.time()
             self.scatt_res.highlight = True
             try:
+                act_next.enabled = True
+                act_pause.enabled = True
                 scan10(self.idx, self.scatt_time.value, self.name_text.value)
                 self.scatt_res.value = get_base_filename()
                 step_progress()
                 self.scatt_res.highlight = False
-            except Exception, e:
+            except :
                 sics.execute('newfile HISTOGRAM_XYT')
                 sics.execute('save')
                 time.sleep(1)
@@ -682,10 +709,25 @@ class Sample():
                     slog('actual collecting time of ' + fn + ' is %.1f s' % at)
                 except:
                     pass
-                raise e
+                raise
             finally:
+                act_next.enabled = False
+                act_pause.enabled = False
+                if __is_collection_interrupted__:
+                    fn = self.scatt_res.value
+                    self.scatt_res.value = '*' + fn
+                    self.scatt_res.highlight = True
+                    try:
+                        at = sics.get_stable_value('/instrument/detector/time').getFloatData()
+                        self.actual_scatt_time = at
+                        slog('actual collecting time of ' + fn + ' is %.1f s' % at)
+                    except:
+                        traceback.print_exc(file=sys.stdout)
+                        slog('error reading detector time')
+                    __is_collection_interrupted__ = False              
 #                self.scatt_res.highlight = False
                 self.scatt_stop_time = time.time()
+            slog('scattering collection is finished for sample number ' + str(self.idx))
             
     def set_enabled(self, flag):
         self.id_label.enabled = flag
@@ -704,11 +746,13 @@ class Sample():
         self.trans_res.value = ''
         self.trans_start_time = 0
         self.trans_stop_time = 0
+        self.actual_trans_time = 0
         
     def reset_scatt_result(self):
         self.scatt_res.value = ''
         self.scatt_start_time = 0
         self.scatt_stop_time = 0
+        self.actual_scatt_time = 0
         
     def get_trans_time_estimation(self):
         global _drive_sample_time
@@ -780,6 +824,8 @@ class Sample():
             if self.actual_trans_time != 0:
                 text += 'actual transmission time is %.1f s' % self.actual_trans_time
             if self.actual_scatt_time != 0:
+                if text != '':
+                    text += '; '
                 text += 'actual scattering time is %.1f s' % self.actual_scatt_time
             if text != '' :
                 commt = SubElement(sp, 'comment')
@@ -813,9 +859,11 @@ class Sample():
             td = SubElement(tr, 'td')
             text = ''
             if self.actual_trans_time != 0:
-                text += 'trans-time = %.1f s' % self.actual_trans_time
+                text += 'trans-time=%.1fs' % self.actual_trans_time
             if self.actual_scatt_time != 0:
-                text += 'scatt-time = %.1f s' % self.actual_scatt_time
+                if text != '' :
+                    text += '; '
+                text += 'scatt-time=%.1fs' % self.actual_scatt_time
             td.text = text 
             return tr
         return None
@@ -1042,7 +1090,7 @@ class SampleTable():
             return tt + st
         
     def run_trans_setup(self):
-        slog('collecting neutrons for transmission')
+        slog('***** start transmission process *****')
         ts = self.trans_setup.value
         if ts != None and len(ts.strip()) > 0:
             slog('running transmission setup ' + str(ts).strip().replace('\r\n', ' + '))
@@ -1052,6 +1100,7 @@ class SampleTable():
                 exec(str(ts))
             finally:
                 self.trans_config_stop_time = time.time()
+            slog('transmission setup is finished')
         
     def run_trans(self):
         if self.need_to_run_trans():
@@ -1065,7 +1114,7 @@ class SampleTable():
             self.run_trans()
 
     def run_scatt_setup(self):
-        slog('collecting neutrons for scattering')
+        slog('***** start scattering process *****')
         ss = self.scatt_setup.value
         if ss != None and len(ss.strip()) > 0:
             slog('running scattering setup ' + str(ss).strip().replace('\r\n', ' + '))
@@ -1075,6 +1124,7 @@ class SampleTable():
                 exec(str(ss))
             finally:
                 self.scatt_config_stop_time = time.time()
+            slog('scattering setup is finished')
         
     def run_scatt(self):
         if self.need_to_run_scatt():
@@ -1159,7 +1209,8 @@ class SampleTable():
         table.set('cellpadding', '2')
         table.set('cellspacing', '0')
         table.set('class', 'xmlTable')
-        table.set('style', 'table-layout:fixed; width:100%; word-wrap:break-word')
+#        table.set('style', 'table-layout:fixed; width:100%; word-wrap:break-word')
+        table.set('style', 'width:100%; word-wrap:break-word')
         tr = SubElement(table, 'tr')
         th = SubElement(tr, 'th')
         th.set('colspan', '2')
@@ -1170,16 +1221,22 @@ class SampleTable():
         
         tr = SubElement(table, 'tr')
         th = SubElement(tr, 'th')
+        th.set("style", "width: 8%;")
         th.text = 'Position'
         th = SubElement(tr, 'th')
+        th.set("style", "width: 20%;")
         th.text = 'Sample Name'
         th = SubElement(tr, 'th')
+        th.set("style", "width: 15%;")
         th.text = 'Transmission'
         th = SubElement(tr, 'th')
+        th.set("style", "width: 15%;")
         th.text = 'Scattering'
         th = SubElement(tr, 'th')
+        th.set("style", "width: 10%;")
         th.text = 'Preset'
         th = SubElement(tr, 'th')
+        th.set("style", "width: 32%;")
         th.text = 'Comment'
         
         for i in sorted(self.samples):
@@ -1340,10 +1397,10 @@ def run_scan():
             if wb.is_enabled() :
                 wb.run()
         slog('workflow is finished')
-    except Exception, e:
+    except :
         msg = traceback.format_exc()
         logBook(msg)
-        raise e
+        raise
     finally:
         act_load.enabled = True
         act_run.enabled = True
@@ -1498,6 +1555,46 @@ def _get_tstring(t):
                 return ("%d " % h) + hs
         return "%d hours" % round(t / 3600)
     
+__workflow_paused__ = False
+
+def pause_workflow():
+    global __workflow_paused__
+    
+    if not __workflow_paused__:
+        status = sics.getStatus()
+        if not status is None and status.upper() == 'COUNTING':
+            __workflow_paused__ = True
+            act_pause.title = 'PAUSED, click to continue.'
+            sics.execute('histmem veto on', 'status')
+            slog('workflow is paused')
+            act_pause.selected = True
+        else:
+            act_pause.title = 'You can only pause when counting. Try Pause again.'
+            act_pause.selected = False
+    else:
+        __workflow_paused__ = False
+        act_pause.title = 'Click to Pause'
+        sics.execute('histmem veto off', 'status')
+        slog('workflow is continued')
+        act_pause.selected = False
+    
+def stop_workflow():
+    slog('send interrupt signal')
+    from org.gumtree.gumnix.sics.core import SicsCore
+#    sics.getSicsController().interrupt()
+    SicsCore.getSicsController().interrupt()
+    
+__is_collection_interrupted__ = False
+def quit_counting():
+    global __is_collection_interrupted__
+    status = sics.getStatus()
+    if not status is None and status.upper() == 'COUNTING':
+        slog('stop counting and move to the next step')
+        sics.execute('histmem pause')
+        __is_collection_interrupted__ = True
+    else:
+        slog('can not move to the next step at ' + str(status) + ' status')
+    
 #def upload_html(wid):
 #    bl = get_workflow_block(wid)
 #    if not bl is None:
@@ -1517,6 +1614,18 @@ act_exp = Act('export_workflow()', 'Export Workflow')
 act_exp.independent = True
 #act_rmv = Act('remove_block()', 'Remove Workflow Block')
 #act_rmv.independent = True
+act_pause = Act('pause_workflow()', 'Click to Pause')
+act_pause.type = 'TOGGLE'
+act_pause.enabled = False
+act_pause.independent = True 
+#act_stop = Act('stop_workflow()', 'Stop/Interrupt')
+#act_stop.independent = True
+#act_stop.no_interrupt_check = True 
+act_next = Act('quit_counting()', 'Move to Next Step')
+act_next.independent = True
+act_next.enabled = False
+
+
 act_add = Act('add_block()', 'Add Workflow Block')
 act_add.independent = True 
 act_run = Act('run_scan()', 'Run Bilby Workflow')
