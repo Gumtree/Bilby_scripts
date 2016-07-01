@@ -652,10 +652,7 @@ class Sample():
                     detector_start = sics.get_stable_value('/instrument/detector/start_time').getIntData()
                     if detector_start > self.trans_start_time :
                         slog('exception caught, now saving collected data')
-                        sics.execute('newfile HISTOGRAM_XYT')
-                        sics.execute('save')
-                        time.sleep(1)
-                        fn = get_base_filename()
+                        fn = save_temp_data()
                         self.trans_res.value = '*' + fn
                         try:
                             at = sics.get_stable_value('/instrument/detector/time').getFloatData()
@@ -710,10 +707,11 @@ class Sample():
                     detector_start = sics.get_stable_value('/instrument/detector/start_time').getIntData()
                     if detector_start > self.scatt_start_time :
                         slog('exception caught, now saving collected data')
-                        sics.execute('newfile HISTOGRAM_XYT')
-                        sics.execute('save')
-                        time.sleep(1)
-                        fn = get_base_filename()
+#                        sics.execute('newfile HISTOGRAM_XYT')
+#                        sics.execute('save')
+#                        time.sleep(1)
+#                        fn = get_base_filename()
+                        fn = save_temp_data()
                         self.scatt_res.value = '*' + fn
                         try:
                             at = sics.get_stable_value('/instrument/detector/time').getFloatData()
@@ -1262,6 +1260,21 @@ class SampleTable():
                 table.append(elmt)
             
         return tostring(table, method = 'html')
+    
+def save_temp_data():
+    cfn = get_base_filename()
+    sics.execute('newfile HISTOGRAM_XYT')
+    sics.execute('save')
+    t = 0
+    fn = None
+    while t < 5 :
+        fn = get_base_filename()
+        if cfn != fn :
+            break
+        time.sleep(0.5)
+        t += 0.5
+    return fn
+
     
 def update_title(wid):
     b = get_workflow_block(wid)
