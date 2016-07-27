@@ -1405,6 +1405,19 @@ def add_block():
 def run_scan():
     global _is_running
     global _start_timestamp
+    is_ready = False
+    try:
+        is_ready = sics.getValue('/instrument/sis/status/ready').getStringData() == 'TRUE'
+    except:
+        pass
+    if not is_ready:
+        is_confirmed = open_question('The instrument is not ready '\
+                    + 'according to the SIS status. Please get the '\
+                    + 'instrument ready. Then click on "Yes" to continue. \n'\
+                    + 'Do you want to continue?')
+        if not is_confirmed:
+            slog('Instrument is not ready. Quit the workflow.')
+            return
     act_load.enabled = False
     act_run.enabled = False
     _is_running = True
