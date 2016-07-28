@@ -373,6 +373,7 @@ class WorkflowBlock():
                        = 'set_enabled(' + str(self.wid) + ')')
         cenabled.title = 'enable/disable'
         cremove = Act('remove_block(' + str(self.wid) + ')', 'Remove This Block')
+        cremove.tool_tip = 'Click to remove this block from the workflow'
 #        cremove = Act('run1()', 'Remove This Block')
         cremove.name = 'cremove_' + str(self.wid)
         cremove.independent = True
@@ -390,6 +391,7 @@ class WorkflowBlock():
         gc.add(gt.group)
         cnew = Act('insert_block(' + str(self.wid) + ')', 'Add New Block Below')
         cnew.name = 'cnew_' + str(self.wid)
+        cnew.tool_tip = 'Click to add/insert a new block below'
         cnew.colspan = 2
         cnew.independent = True
         globals()[str(cnew.name)] = cnew
@@ -1656,25 +1658,30 @@ par_time.title = 'Time Estimation'
 par_time.enabled = False
 
 act_load = Act('load_workflow()', 'Load Workflow')
+act_load.tool_tip = 'Click to load workflow from a file'
 act_exp = Act('export_workflow()', 'Export Workflow')
 act_exp.independent = True
+act_exp.tool_tip = 'Click to save current workflow to the file system'
 #act_rmv = Act('remove_block()', 'Remove Workflow Block')
 #act_rmv.independent = True
 act_pause = Act('pause_workflow()', 'Click to Pause')
 act_pause.type = 'TOGGLE'
 act_pause.enabled = False
 act_pause.independent = True 
+act_pause.tool_tip = 'Click to pause/unpause the workflow'
 #act_stop = Act('stop_workflow()', 'Stop/Interrupt')
 #act_stop.independent = True
 #act_stop.no_interrupt_check = True 
 act_next = Act('quit_counting()', 'Move to Next Step')
 act_next.independent = True
 act_next.enabled = False
-
+act_next.tool_tip = 'Click to quit counting, and move to the next collection point'
 
 act_add = Act('add_block()', 'Add Workflow Block')
 act_add.independent = True 
+act_add.tool_tip = 'Click to add a new block to the end of the workflow'
 act_run = Act('run_scan()', 'Run Bilby Workflow')
+act_run.tool_tip = 'Click to run the workflow'
 #act_run.colspan = 2
     
 #def add_sample(table, i):
