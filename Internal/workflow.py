@@ -352,11 +352,13 @@ __workflow_id__ = 0
 __report_folder__ = 'W:/data/current/reports/pWorkflow'
 _is_running = False
 _start_timestamp = 0
-_counting_status = 'in progress'
+_counting_status = 'counting'
+_driving_status = 'driving'
 _block_config_time = 5 * 60
 _trans_setup_time = 1 * 60
 _scatt_setup_time = 1 * 60
 _drive_sample_time = 20
+_default_config_name = "L1=#_L2=#_ctn=#_name=WB"
 
 class WorkflowBlock():
     def __init__(self):
@@ -365,10 +367,11 @@ class WorkflowBlock():
         __workflow_id__ += 1
 #        self.config = config
 #        self.samples = samples
-        tt = 'Workflow Block #' + str(self.wid)
+#        tt = 'Workflow Block #' + str(self.wid)
+        tt = _default_config_name + str(self.wid)
         gc = Group(tt)
         gc.colspan = 2
-        gc.numColumns = 2
+        gc.numColumns = 4
         cenabled = Par('bool', True, command \
                        = 'set_enabled(' + str(self.wid) + ')')
         cenabled.title = 'enable/disable'
@@ -377,28 +380,44 @@ class WorkflowBlock():
 #        cremove = Act('run1()', 'Remove This Block')
         cremove.name = 'cremove_' + str(self.wid)
         cremove.independent = True
+        cremove.colspan = 2
         globals()[str(cremove.name)] = cremove
         ctitle = Par('string', tt, command \
                      = 'update_title(' + str(self.wid) + ')')
         ctitle.title = 'title'
+#        ctitle.colspan = 2
+        cload = Act('load_config(' + str(self.wid) + ')', 'Load Configuration')
+        cload.tool_tip = 'Click to load saved configuration from file system'
+        cload.name = 'cload_' + str(self.wid)
+        cload.independent = True
+        globals()[str(cload.name)] = cload
+        csave = Act('save_config(' + str(self.wid) + ')', 'Save Configuration')
+        csave.tool_tip = 'Click to save configuration to file system'
+        csave.name = 'csave_' + str(self.wid)
+        csave.independent = True
+        globals()[str(csave.name)] = csave
         ctext = Par('string', '')
         ctext.height = 60
         ctext.rowspan = 3
+        ctext.colspan = 2
         ctext.title = 'configuration'
-        gc.add(cenabled, ctext, ctitle, cremove)
+        gc.add(cenabled, ctitle, ctext, cload, csave, cremove)
         #gs = Group('samples')
         gt = SampleTable(self.wid)
+        gt.group.colspan = 4
         gc.add(gt.group)
         cnew = Act('insert_block(' + str(self.wid) + ')', 'Add New Block Below')
         cnew.name = 'cnew_' + str(self.wid)
         cnew.tool_tip = 'Click to add/insert a new block below'
-        cnew.colspan = 2
+        cnew.colspan = 4
         cnew.independent = True
         globals()[str(cnew.name)] = cnew
         gc.add(cnew)
         self.group = gc
         self.enabled = cenabled
         self.remove = cremove
+        self.cload = cload
+        self.csave = csave
         self.title = ctitle
         self.config = ctext
         self.table = gt
@@ -433,6 +452,8 @@ class WorkflowBlock():
         self.table.dispose()
         self.group.dispose()
         self.new_block.dispose()
+        self.cload.dispose()
+        self.csave.dispose()
         
     def run(self):
         tt = self.title.value
@@ -633,26 +654,41 @@ class Sample():
         
     def run_transmission(self):
         global _counting_status
+        global _driving_status
         global __is_collection_interrupted__
         if self.do_trans.value and len(self.trans_res.value.strip()) == 0:
             slog('start transmission collection for sample number ' + str(self.idx))
             if len(str(self.name_text.value)) > 0:
                 slog('transmission: ' + str(self.name_text.value))
-            self.trans_res.value = _counting_status
+#            self.trans_res.value = _counting_status
             self.trans_stop_time = 0
             self.trans_start_time = time.time()
             self.trans_res.highlight = True
             try:
+                if sample() != self.idx :
+                    act_next.enabled = True
+                    self.trans_res.value = _driving_status
+                    slog('driving sample to ' + str(self.idx))
+                    sample(self.idx)
+            except:
+                act_next.enabled = False
+                act_pause.enabled = False
+                slog('driving sample failed')
+                self.trans_stop_time = time.time()
+                raise
+            try:
+                self.trans_res.value = _counting_status
                 act_next.enabled = True
                 act_pause.enabled = True
+                old_filename = get_base_filename()
                 scan10(self.idx, self.trans_time.value, self.name_text.value)
-                self.trans_res.value = get_base_filename()
+                self.trans_res.value = get_new_filename(old_filename)
                 step_progress()
                 self.trans_res.highlight = False
             except :
                 try:
                     detector_start = sics.get_stable_value('/instrument/detector/start_time').getIntData()
-                    if detector_start > self.trans_start_time :
+                    if detector_start > self.trans_start_time + 1:
                         slog('exception caught, now saving collected data')
                         fn = save_temp_data()
                         self.trans_res.value = '*' + fn
@@ -688,26 +724,41 @@ class Sample():
                 
     def run_scattering(self):
         global _counting_status
+        global _driving_status
         global __is_collection_interrupted__
         if self.do_scatt.value and len(self.scatt_res.value.strip()) == 0:
             slog('start scattering collection for sample number ' + str(self.idx))
             if len(str(self.name_text.value)) > 0:
                 slog('scattering: ' + str(self.name_text.value))
-            self.scatt_res.value = _counting_status
+#            self.scatt_res.value = _counting_status
             self.scatt_stop_time = 0
             self.scatt_start_time = time.time()
             self.scatt_res.highlight = True
             try:
+                if sample() != self.idx :
+                    act_next.enabled = True
+                    self.scatt_res.value = _driving_status
+                    slog('driving sample to ' + str(self.idx))
+                    sample(self.idx)
+            except:
+                act_next.enabled = False
+                act_pause.enabled = False
+                slog('driving sample failed')
+                self.scatt_stop_time = time.time()
+                raise
+            try:
+                self.scatt_res.value = _counting_status
                 act_next.enabled = True
                 act_pause.enabled = True
+                old_filename = get_base_filename()
                 scan10(self.idx, self.scatt_time.value, self.name_text.value)
-                self.scatt_res.value = get_base_filename()
+                self.scatt_res.value = get_new_filename(old_filename)
                 step_progress()
                 self.scatt_res.highlight = False
             except :
                 try:
                     detector_start = sics.get_stable_value('/instrument/detector/start_time').getIntData()
-                    if detector_start > self.scatt_start_time :
+                    if detector_start > self.scatt_start_time + 1:
                         slog('exception caught, now saving collected data')
 #                        sics.execute('newfile HISTOGRAM_XYT')
 #                        sics.execute('save')
@@ -833,9 +884,17 @@ class Sample():
             sp.set('index', str(self.idx))
             sp.set('name', self.name_text.value.strip())
             trans = SubElement(sp, 'transmission')
-            trans.text = self.trans_res.value.strip()
+            text = self.trans_res.value.strip()
+            trans.set('runID', get_run_id(text))
+            trans.set('preset', self.trans_time.value.strip())
+            trans.set('actual', self.actual_trans_time.value.strip())
+            trans.text = text
             scatt = SubElement(sp, 'scattering')
-            scatt.text = self.scatt_res.value.strip()
+            text = self.scatt_res.value.strip()
+            scatt.set('runID', get_run_id(text))
+            scatt.set('preset', self.scatt_time.value.strip())
+            scatt.set('actual', self.actual_scatt_time.value.strip())
+            scatt.text = text
             text = ''
             if self.actual_trans_time != 0:
                 text += 'actual transmission time is %.1f s' % self.actual_trans_time
@@ -897,7 +956,7 @@ class SampleTable():
         self.group = Group(name)
         self.group.hideTitle = True
         self.group.numColumns = 8
-        self.group.colspan = 2
+        self.group.colspan = 4
         trans_setup = Par('string', '')
         trans_setup.title = 'transmission setup'
         trans_setup.colspan = 4
@@ -1266,6 +1325,7 @@ class SampleTable():
 def save_temp_data():
     cfn = get_base_filename()
     sics.execute('newfile HISTOGRAM_XYT')
+    time.sleep(0.5)
     sics.execute('save')
     t = 0
     fn = None
@@ -1341,8 +1401,31 @@ def remove_block(wid = None):
                 __UI__.updateUI()
                 update_progress()
 
+def get_run_id(text):
+    if text is None:
+        return ''
+    if text.startswith('*'):
+        text = text.replace('*', '')
+    if text.startswith('BBY'):
+        text = text[3:]
+    if text.endswith('.nx.hdf'):
+        text = text[:-7]
+    return text
+    
+def get_new_filename(old_filename = None, timeout = 5):
+    t = 0
+    fn = None
+    while t < timeout :
+        fn = get_base_filename()
+        if old_filename != fn :
+            break
+        time.sleep(0.5)
+        t += 0.5
+    return fn
+    
 def insert_block(wid):
     global workflow_list
+    global _default_config_name
     old = None
     idx = -1
     for i in xrange(len(workflow_list)):
@@ -1359,6 +1442,9 @@ def insert_block(wid):
         try:
             wb.group.moveAfterObject(old.group)
             wb.config.value = old.config.value
+            config_name = old.title.value
+            if not config_name.startswith(_default_config_name):
+                wb.title.value = old.title.value
             wb.table.t3.value = old.table.t3.value
             wb.table.t5.value = old.table.t5.value
             wb.table.trans_time.value = old.table.trans_time.value
@@ -1379,6 +1465,7 @@ def insert_block(wid):
                 
 def add_block():
     global workflow_list
+    global _default_config_name
     old = None
     if len(workflow_list) > 0 :
         old = workflow_list[-1]
@@ -1387,6 +1474,9 @@ def add_block():
     try:
         if not old is None:
             wb.config.value = old.config.value
+            config_name = old.title.value
+            if not config_name.startswith(_default_config_name):
+                wb.title.value = old.title.value
             wb.table.t3.value = old.table.t3.value
             wb.table.t5.value = old.table.t5.value
             wb.table.trans_time.value = old.table.trans_time.value
@@ -1455,6 +1545,83 @@ def run_scan():
         update_time()
         sics.execute('hset /experiment/gumtree_time_estimate 0')
         
+def load_config(wid):
+    global workflow_list
+    fn = selectLoadFile(['*.cfg'], 'scripts/configurations')
+    if not fn is None:
+        wb = get_workflow_block(wid)
+        if not wb is None:
+            with open(fn, 'r') as cfile:
+                config = ''
+                trans_setup = ''
+                scatt_setup = ''
+                is_config = True
+                is_scatt = False
+                is_trans = False
+                for line in cfile:
+                    sl = line.strip()
+                    if sl.startswith('#') \
+                        and sl.__contains__('transmission setup'):
+                        is_trans = True
+                        is_scatt = False
+                        is_config = False
+                    elif sl.startswith('#') \
+                        and sl.__contains__('scattering setup'):
+                        is_trans = False
+                        is_scatt = True
+                        is_config = False
+                    else:
+                        if is_config:
+                            config += line
+                        elif is_trans:
+                            trans_setup += line
+                        elif is_scatt:
+                            scatt_setup += line
+                wb.config.value = config.strip()
+                wb.table.trans_setup.value = trans_setup.strip()
+                wb.table.scatt_setup.value = scatt_setup.strip()
+                sn = os.path.basename(fn)
+                if fn.lower().endswith('.cfg'):
+                    sn = sn[:-4]
+                wb.title.value = sn
+
+def save_config(wid):
+    global workflow_list
+    wb = get_workflow_block(wid)
+    if wb is None:
+        slog('error: failed to find block ' + str(wid))
+        return
+    cname = wb.title.value
+    if cname is None:
+        cname = 'L1=#_L2=#_ctn=#_name=#.cfg'
+    else:
+        if not cname.lower().endswith('.cfg'):
+            cname += '.cfg'
+    fn = selectSaveFile(['*.cfg'], 'scripts/configurations', cname)
+    if not fn is None:
+        if os.path.isfile(fn):
+            cf = confirm(fn + ' already exists. ' \
+            + 'Do you want to overwrite the file?')
+            if not cf:
+                return
+        if not wb is None:
+            with open(fn, 'w') as cfile:
+                text = wb.config.value
+                if text != None:
+                    text = text.replace('\r\n', '\n')
+                cfile.write(text)
+                trans_setup = wb.table.trans_setup.value
+                if len(trans_setup.strip()) > 0:
+                    cfile.write('\n#transmission setup\n' + trans_setup.replace('\r\n', '\n'))
+                scatt_setup = wb.table.scatt_setup.value
+                if len(scatt_setup.strip()) > 0:
+                    cfile.write('\n#scattering setup\n' + scatt_setup.replace('\r\n', '\n'))
+                cname = os.path.basename(fn)
+                if cname.lower().endswith('.cfg'):
+                    cname = cname[:-4]
+                wb.title.value = cname
+                slog('successfully saved configuration to ' + fn)
+    
 def load_workflow():
     global workflow_list
     fn = selectSaveFile(['*.pkl'])
