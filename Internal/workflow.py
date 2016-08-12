@@ -1624,7 +1624,7 @@ def save_config(wid):
     
 def load_workflow():
     global workflow_list
-    fn = selectSaveFile(['*.pkl'])
+    fn = selectLoadFile(['*.pkl'], None)
     if fn is None:
         return
     wl = None
