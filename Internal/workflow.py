@@ -927,6 +927,8 @@ class Sample():
             else:
                 td.text = text
             td = SubElement(tr, 'td')
+            td.text = str(self.trans_time.value)
+            td = SubElement(tr, 'td')
             text = get_short_pdfname(self.scatt_res.value.strip())
             if text.startswith('*'):
                 font = SubElement(td, 'font')
@@ -1296,7 +1298,7 @@ class SampleTable():
         th.set('colspan', '2')
         th.text = strftime("%Y-%m-%dT%H:%M:%S", localtime())
         th = SubElement(tr, 'th')
-        th.set('colspan', '4')
+        th.set('colspan', '5')
         th.text = title
         
         tr = SubElement(table, 'tr')
@@ -1304,19 +1306,22 @@ class SampleTable():
         th.set("style", "width: 8%;")
         th.text = 'Position'
         th = SubElement(tr, 'th')
-        th.set("style", "width: 20%;")
+        th.set("style", "width: 18%;")
         th.text = 'Sample Name'
         th = SubElement(tr, 'th')
-        th.set("style", "width: 15%;")
+        th.set("style", "width: 14%;")
         th.text = 'Transmission'
         th = SubElement(tr, 'th')
-        th.set("style", "width: 15%;")
-        th.text = 'Scattering'
-        th = SubElement(tr, 'th')
-        th.set("style", "width: 10%;")
+        th.set("style", "width: 8%;")
         th.text = 'Preset'
         th = SubElement(tr, 'th')
-        th.set("style", "width: 32%;")
+        th.set("style", "width: 14%;")
+        th.text = 'Scattering'
+        th = SubElement(tr, 'th')
+        th.set("style", "width: 8%;")
+        th.text = 'Preset'
+        th = SubElement(tr, 'th')
+        th.set("style", "width: 30%;")
         th.text = 'Comment'
         
         for i in sorted(self.samples):
