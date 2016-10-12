@@ -342,6 +342,20 @@ sics.ready = True
 
 # Use below example to create a button
 __number_of_sample__ = 10
+try:
+    uplim = sics.get_raw_value('samx softupperlim')
+    lowlim = sics.get_raw_value('samx softlowerlim')
+    slim = uplim - lowlim
+    if slim > 1000 :
+        __number_of_sample__ = 10
+    else:
+        __number_of_sample__ = 5
+#    __number_of_sample__ = 5
+    slog('sample stage used: ' + str(__number_of_sample__) + ' samples')
+    bilby.__sampleNum__ = __number_of_sample__
+except:
+    pass
+
 __default_transmission_time__ = 60
 __default_scattering_time__ = 120
 
