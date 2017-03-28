@@ -415,7 +415,7 @@ class WorkflowBlock():
         csave.independent = True
         globals()[str(csave.name)] = csave
         ctest = Act('test_config(' + str(self.wid) + ')', 'Test Run')
-        ctest.enabled = False
+        ctest.enabled = True
         ctest.tool_tip = 'Click to test run the configuration and scan setup'
         ctest.name = 'ctest_' + str(self.wid)
         globals()[str(ctest.name)] = ctest
@@ -488,7 +488,7 @@ class WorkflowBlock():
     def test_config(self):
         slog('test run configuration')
         test_exec(str(self.config.value))
-        self.table.test_run()
+#        self.table.test_run()
         
     def run(self):
         tt = self.title.value
@@ -1394,6 +1394,20 @@ def save_temp_data():
 #        b.update_title()
 
 def test_config(wid):
+    is_ready = False
+    try:
+        is_ready = sics.getValue('/instrument/sis/status/ready').getStringData() == 'TRUE'
+    except:
+        pass
+    if is_ready:
+        is_confirmed = open_question('Warning, the instrument shutter is open '\
+                    + 'according to the SIS status. It is recommended to close '\
+                    + 'the shutter when testing. \nPlease close the shutter, then '\
+                    + 'click on "Yes" to continue. \n'\
+                    + 'Do you want to continue?')
+        if not is_confirmed:
+            slog('Testing is cancelled.', True)
+            return
     b = get_workflow_block(wid)
     if not b is None:
         b.test_config()
