@@ -415,6 +415,7 @@ class WorkflowBlock():
         csave.independent = True
         globals()[str(csave.name)] = csave
         ctest = Act('test_config(' + str(self.wid) + ')', 'Test Run')
+        ctest.enabled = False
         ctest.tool_tip = 'Click to test run the configuration and scan setup'
         ctest.name = 'ctest_' + str(self.wid)
         globals()[str(ctest.name)] = ctest
