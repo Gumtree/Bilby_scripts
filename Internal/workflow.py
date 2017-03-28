@@ -93,7 +93,7 @@ def add_dataset():
 #        __DATASOURCE__.addDataset(__file_to_add__, True)
         slog('adding ' + str(__file_to_add__))
     except:
-        slog( 'error in adding dataset: ' + __file_to_add__ )
+        slog( 'error in adding dataset: ' + __file_to_add__, True)
         
     try:
         def remote_path(local):
@@ -178,13 +178,13 @@ class __SaveCountListener__(DynamicControllerListenerAdapter):
                 checkFile = File(__data_folder__ + "/" + checkFile.getName());
                 __file_to_add__ = checkFile.getAbsolutePath();
                 if not checkFile.exists():
-                    slog( "The target file :" + __file_to_add__ + " can not be found" )
+                    slog( "The target file :" + __file_to_add__ + " can not be found", True)
                     return
                 runnable = __Display_Runnable__()
                 runnable.run = add_dataset
                 Display.getDefault().asyncExec(runnable)
             except: 
-                slog( 'failed to add dataset ' + __file_to_add__ )
+                slog( 'failed to add dataset ' + __file_to_add__, True)
                     
 __saveCountListener__ = __SaveCountListener__()
 __save_count_node__.addComponentListener(__saveCountListener__)
@@ -255,8 +255,11 @@ def logBook(text):
         traceback.print_exc(file=sys.stdout)
         print 'failed to log'
     
-def slog(text):
-    logln(text + '\n')
+def slog(text, f_err = False):
+    if f_err:
+        logErr(text + '\n')
+    else:
+        logln(text + '\n')
     logBook(text)
 
 class BatchStatusListener(SicsProxyListenerAdapter):
@@ -394,7 +397,7 @@ class WorkflowBlock():
 #        cremove = Act('run1()', 'Remove This Block')
         cremove.name = 'cremove_' + str(self.wid)
         cremove.independent = True
-        cremove.colspan = 2
+        cremove.colspan = 1
         globals()[str(cremove.name)] = cremove
 #        ctitle = Par('string', tt, command \
 #                     = 'update_title(' + str(self.wid) + ')')
@@ -411,12 +414,16 @@ class WorkflowBlock():
         csave.name = 'csave_' + str(self.wid)
         csave.independent = True
         globals()[str(csave.name)] = csave
+        ctest = Act('test_config(' + str(self.wid) + ')', 'Test Run')
+        ctest.tool_tip = 'Click to test run the configuration and scan setup'
+        ctest.name = 'ctest_' + str(self.wid)
+        globals()[str(ctest.name)] = ctest
         ctext = Par('string', '')
         ctext.height = 60
         ctext.rowspan = 3
         ctext.colspan = 2
         ctext.title = 'configuration'
-        gc.add(cenabled, ctitle, ctext, cload, csave, cremove)
+        gc.add(cenabled, ctitle, ctext, cload, csave, ctest, cremove)
         #gs = Group('samples')
         gt = SampleTable(self.wid)
         gt.group.colspan = 4
@@ -431,6 +438,7 @@ class WorkflowBlock():
         self.group = gc
         self.enabled = cenabled
         self.remove = cremove
+        self.ctest = ctest
         self.cload = cload
         self.csave = csave
         self.title = ctitle
@@ -451,6 +459,7 @@ class WorkflowBlock():
         self.title.enabled = flag
         self.config.enabled = flag
         self.table.set_enabled(flag)
+        self.ctest.enabled = flag
         if flag:
             slog('block #' + str(self.wid) + ' is enabled')
         else:
@@ -473,6 +482,12 @@ class WorkflowBlock():
         self.new_block.dispose()
         self.cload.dispose()
         self.csave.dispose()
+        self.ctest.dispose()
+        
+    def test_config(self):
+        slog('test run configuration')
+        test_exec(str(self.config.value))
+        self.table.test_run()
         
     def run(self):
         tt = self.title.value
@@ -708,7 +723,7 @@ class Sample():
                 try:
                     detector_start = sics.get_stable_value('/instrument/detector/start_time').getIntData()
                     if detector_start > self.trans_start_time + 1:
-                        slog('exception caught, now saving collected data')
+                        slog('exception caught, now saving collected data', True)
                         fn = save_temp_data()
                         self.trans_res.value = '*' + fn
                         try:
@@ -720,8 +735,10 @@ class Sample():
                     else:
                         self.trans_res.value = ''
                         slog('counting has not started, no data is available.')
-                finally:
-                    raise
+                except Exception, e: 
+                    slog('failed to do clean up routine in error handling, ' + str(e), True)
+                slog('finished clean up routine in error handling, now quit', True)
+                raise
             finally:
 #                self.trans_res.highlight = False
                 act_next.enabled = False
@@ -734,10 +751,10 @@ class Sample():
                     try:
                         at = sics.get_stable_value('/instrument/detector/time').getFloatData()
                         self.actual_trans_time = at
-                        slog('actual collecting time of ' + fn + ' is %.1f s' % at)
+                        slog('actual collecting time of ' + fn + ' is %.1f s' % at, True)
                     except:
                         traceback.print_exc(file=sys.stdout)
-                        slog('error reading detector time')
+                        slog('error reading detector time', True)
                 self.trans_stop_time = time.time()
             slog('transmission collection is finished for sample number ' + str(self.idx))
                 
@@ -762,7 +779,7 @@ class Sample():
             except:
                 act_next.enabled = False
                 act_pause.enabled = False
-                slog('driving sample failed')
+                slog('driving sample failed', True)
                 self.scatt_stop_time = time.time()
                 raise
             try:
@@ -778,7 +795,7 @@ class Sample():
                 try:
                     detector_start = sics.get_stable_value('/instrument/detector/start_time').getIntData()
                     if detector_start > self.scatt_start_time + 1:
-                        slog('exception caught, now saving collected data')
+                        slog('exception caught, now saving collected data', True)
 #                        sics.execute('newfile HISTOGRAM_XYT')
 #                        sics.execute('save')
 #                        time.sleep(1)
@@ -788,14 +805,16 @@ class Sample():
                         try:
                             at = sics.get_stable_value('/instrument/detector/time').getFloatData()
                             self.actual_scatt_time = at
-                            slog('actual collecting time of ' + fn + ' is %.1f s' % at)
+                            slog('actual collecting time of ' + fn + ' is %.1f s' % at, True)
                         except:
                             pass
                     else :
                         self.scatt_res.value = ''
                         slog('counting has not started, no data is available.')
-                finally:
-                    raise
+                except Exception, e:
+                    slog('failed to do clean up routine in error handling, ' + str(e), True)
+                slog('finished clean up routine in error handling, now quit', True)
+                raise
             finally:
                 act_next.enabled = False
                 act_pause.enabled = False
@@ -1045,6 +1064,12 @@ class SampleTable():
         self.group.add(sample.id_label, sample.name_text, sample.do_trans, sample.trans_time, \
                  sample.trans_res, sample.do_scatt, sample.scatt_time, sample.scatt_res)
     
+    def test_run(self):
+        slog('test running transmission setup')
+        test_exec(self.trans_setup.value)
+        slog('test running scattering setup')
+        test_exec(self.scatt_setup.value)
+        
     def run(self):
 #        self.trans_time.enabled = False
 #        self.scatt_time.enabled = False
@@ -1367,6 +1392,11 @@ def save_temp_data():
 #    if not b is None:
 #        b.update_title()
 
+def test_config(wid):
+    b = get_workflow_block(wid)
+    if not b is None:
+        b.test_config()
+    
 def set_enabled(wid):
     b = get_workflow_block(wid)
     if not b is None:
@@ -1544,7 +1574,7 @@ def run_scan():
                     + 'instrument ready. Then click on "Yes" to continue. \n'\
                     + 'Do you want to continue?')
         if not is_confirmed:
-            slog('Instrument is not ready. Quit the workflow.')
+            slog('Instrument is not ready. Quit the workflow.', True)
             return
     act_load.enabled = False
     act_run.enabled = False
@@ -1557,7 +1587,7 @@ def run_scan():
         path += '/workflow_' + strftime("%Y-%m-%dT%H-%M-%S", localtime()) + '.pkl'
         export_workflow(path)
     except:
-        slog('faied to auto save')
+        slog('faied to auto save', True)
     try:
         slog('start Bilby workflow')
         for wb in workflow_list:
@@ -1647,7 +1677,7 @@ def load_config(wid):
                 wb.title.value = sn
                 slog('load configuration to block #' + str(wid) + ' from ' + str(fn))
         else:
-            slog('failed to find block #' + str(wid))
+            slog('failed to find block #' + str(wid), True)
     else:
         slog('cancel loading configuration')
 
@@ -1655,7 +1685,7 @@ def save_config(wid):
     global workflow_list
     wb = get_workflow_block(wid)
     if wb is None:
-        slog('error: failed to find block ' + str(wid))
+        slog('error: failed to find block ' + str(wid), True)
         return
     cname = wb.title.value
     if cname is None:
@@ -1688,7 +1718,7 @@ def save_config(wid):
                 wb.title.value = cname
                 slog('successfully saved configuration to ' + fn)
         else:
-            slog('failed to save configuration: errors in the block')
+            slog('failed to save configuration: errors in the block', True)
     else:
         slog('cancel saving configuration')
     
@@ -1716,7 +1746,7 @@ def load_workflow():
                 workflow_list[i].from_rep(wl[i])
             slog('workflow loaded from ' + str(fn))
         else:
-            slog('invalid workflow file at ' + str(fn))
+            slog('invalid workflow file at ' + str(fn), True)
     finally:
         __UI__.updateUI()
         update_time()
@@ -1853,7 +1883,7 @@ def pause_workflow():
             slog('workflow is paused')
             act_pause.selected = True
         else:
-            slog('failed to pause workflow')
+            slog('failed to pause workflow', True)
             act_pause.title = 'You can only pause when counting. Try Pause again.'
             act_pause.selected = False
     else:
@@ -1882,8 +1912,14 @@ def quit_counting():
         sics.execute('histmem pause')
         __is_collection_interrupted__ = True
     else:
-        slog('can not move to the next step at ' + str(status) + ' status')
-    
+        slog('can not move to the next step at ' + str(status) + ' status', True)
+
+def test_exec(text):
+    try:
+        exec(text)
+    except:
+        slog(str(traceback.format_exc().splitlines()[-1]), f_err = True)
+     
 #def upload_html(wid):
 #    bl = get_workflow_block(wid)
 #    if not bl is None:
