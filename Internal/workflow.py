@@ -345,15 +345,26 @@ sics.ready = True
 
 # Use below example to create a button
 __number_of_sample__ = 10
+#try:
+#    uplim = sics.get_raw_value('samx softupperlim')
+#    lowlim = sics.get_raw_value('samx softlowerlim')
+#    slim = uplim - lowlim
+#    if slim > 1000 :
+#        __number_of_sample__ = 10
+#    else:
+#        __number_of_sample__ = 5
+##    __number_of_sample__ = 5
+#    slog('sample stage used: ' + str(__number_of_sample__) + ' samples')
+#    bilby.__sampleNum__ = __number_of_sample__
+#except:
+#    pass
+''' modified on 29/03/2017, using samz to decide which stage is used '''
 try:
-    uplim = sics.get_raw_value('samx softupperlim')
-    lowlim = sics.get_raw_value('samx softlowerlim')
-    slim = uplim - lowlim
-    if slim > 1000 :
+    z = get_raw_value('samz')
+    if z > 150 and z < 180 :
         __number_of_sample__ = 10
     else:
         __number_of_sample__ = 5
-#    __number_of_sample__ = 5
     slog('sample stage used: ' + str(__number_of_sample__) + ' samples')
     bilby.__sampleNum__ = __number_of_sample__
 except:
