@@ -251,8 +251,11 @@ def logBook(text):
         traceback.print_exc(file=sys.stdout)
         print 'failed to log'
     
-def slog(text):
-    logln(text + '\n')
+def slog(text, f_err = False):
+    if f_err:
+        logErr(text + '\n')
+    else:
+        logln(text + '\n')
     logBook(text)
 
 

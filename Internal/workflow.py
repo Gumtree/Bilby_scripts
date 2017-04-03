@@ -49,7 +49,7 @@ except:
 fi = File(__buffer_log_file__)
 if not fi.exists():
     if not fi.mkdirs():
-        print 'Error: failed to make directory: ' + __buffer_log_file__
+        slog('Error: failed to make directory: ' + __buffer_log_file__, True)
 __history_log_file__ = __buffer_log_file__ + '/History.txt'
 __buffer_log_file__ += '/LogFile.txt'
 __buffer_logger__ = open(__buffer_log_file__, 'a')
@@ -154,7 +154,7 @@ def add_dataset():
 
     except:
         msg = traceback.format_exc()
-        logBook(msg)
+        slog(msg, True)
         traceback.print_exc(file=sys.stdout)
 #        slog( 'failed to create tar file for ' + __file_to_add__ )
     finally:
@@ -195,7 +195,7 @@ def update_buffer_log_folder():
     fi = File(__buffer_log_file__)
     if not fi.exists():
         if not fi.mkdirs():
-            print 'Error: failed to make directory: ' + __buffer_log_file__
+            slog('Error: failed to make directory: ' + __buffer_log_file__, True)
     __history_log_file__ = __buffer_log_file__ + '/History.txt'
     __buffer_log_file__ += '/LogFile.txt'
     if __buffer_logger__:
@@ -719,7 +719,7 @@ class Sample():
             except:
                 act_next.enabled = False
                 act_pause.enabled = False
-                slog('driving sample failed')
+                slog('driving sample failed', True)
                 self.trans_stop_time = time.time()
                 raise
             try:
@@ -741,12 +741,12 @@ class Sample():
                         try:
                             at = sics.get_stable_value('/instrument/detector/time').getFloatData()
                             self.actual_trans_time = at
-                            slog('actual collecting time of ' + fn + ' is %.1f s' % at)
+                            slog('actual collecting time of ' + fn + ' is %.1f s' % at, True)
                         except:
                             pass
                     else:
                         self.trans_res.value = ''
-                        slog('counting has not started, no data is available.')
+                        slog('counting has not started, no data is available.', True)
                 except Exception, e: 
                     slog('failed to do clean up routine in error handling, ' + str(e), True)
                 slog('finished clean up routine in error handling, now quit', True)
@@ -822,7 +822,7 @@ class Sample():
                             pass
                     else :
                         self.scatt_res.value = ''
-                        slog('counting has not started, no data is available.')
+                        slog('counting has not started, no data is available.', True)
                 except Exception, e:
                     slog('failed to do clean up routine in error handling, ' + str(e), True)
                 slog('finished clean up routine in error handling, now quit', True)
@@ -841,7 +841,7 @@ class Sample():
                         slog('actual collecting time of ' + fn + ' is %.1f s' % at)
                     except:
                         traceback.print_exc(file=sys.stdout)
-                        slog('error reading detector time')
+                        slog('error reading detector time', True)
 #                self.scatt_res.highlight = False
                 self.scatt_stop_time = time.time()
             slog('scattering collection is finished for sample number ' + str(self.idx))
@@ -1632,7 +1632,7 @@ def run_scan():
         slog('workflow is finished')
     except :
         msg = traceback.format_exc()
-        logBook(msg)
+        slog(msg, True)
         raise
     finally:
         act_load.enabled = True
@@ -1655,7 +1655,7 @@ def get_next_block(owb = None):
         try:
             idx = workflow_list.index(owb)
         except:
-            slog('get_next_block(): failed to find block #' + str(owb.wid))
+            slog('get_next_block(): failed to find block #' + str(owb.wid), True)
         if idx + 1 >= len(workflow_list):
             return None
         else:
@@ -1789,7 +1789,7 @@ def export_workflow(path = None):
     fp = fi.getParentFile()
     if not fp.exists():
         if not fp.makedirs():
-            print 'Error: failed to make directory: ' + path
+            slog('Error: failed to make directory: ' + path, True)
             return
     slog('workflow exported to ' + path)
     file = open(path, 'wb')
