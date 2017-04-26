@@ -69,6 +69,7 @@ __file_status_node__ = sics.getSicsController().findComponentController('/experi
 #saveCount = int(saveCountNode.getValue().getIntData())
 __cur_status__ = str(__scan_status_node__.getValue().getStringData())
 __file_name__ = str(__file_name_node__.getValue().getStringData())
+__data_file_timestamp__ = 0
 
 class __Display_Runnable__(Runnable):
     
@@ -80,14 +81,21 @@ class __Display_Runnable__(Runnable):
         global __dispose_listener__
         __UI__.addDisposeListener(__dispose_listener__)
 
+
 __file_to_add__ = None
 __newfile_enabled__ = True
 def add_dataset():
-    global __newfile_enabled__
+    global __newfile_enabled__, __data_file_timestamp__
     if not __newfile_enabled__ :
         return
     if __file_to_add__ is None:
         return
+    
+#    check if file has already been processed.
+    if __data_file_timestamp__ == os.path.getmtime(__file_to_add__):
+        slog("file " + __file_to_add__ + " has already been processed. Skipping ...")
+        return
+    
     global __DATASOURCE__
     try:
 #        __DATASOURCE__.addDataset(__file_to_add__, True)
@@ -96,6 +104,8 @@ def add_dataset():
         slog( 'error in adding dataset: ' + __file_to_add__, True)
         
     try:
+        __data_file_timestamp__ == os.path.getmtime(__file_to_add__)
+
         def remote_path(local):
             result = local.replace('\\', '/')
             if result[0:2] == 'W:':
@@ -151,7 +161,6 @@ def add_dataset():
         
         finally:
             sock.close()
-
     except:
         msg = traceback.format_exc()
         slog(msg, True)
@@ -170,8 +179,7 @@ class __SaveCountListener__(DynamicControllerListenerAdapter):
         global __file_to_add__
         newCount = int(newValue.getStringData());
         if newCount != self.saveCount:
-            self.saveCount = newCount;
-            if newCount != 1:
+            if newCount == 0:
                 return
             try:
                 checkFile = File(__file_name_node__.getValue().getStringData());
@@ -180,14 +188,39 @@ class __SaveCountListener__(DynamicControllerListenerAdapter):
                 if not checkFile.exists():
                     slog( "The target file :" + __file_to_add__ + " can not be found", True)
                     return
-                runnable = __Display_Runnable__()
-                runnable.run = add_dataset
-                Display.getDefault().asyncExec(runnable)
+                add_dataset()
             except: 
                 slog( 'failed to add dataset ' + __file_to_add__, True)
+        self.saveCount = newCount;
                     
 __saveCountListener__ = __SaveCountListener__()
 __save_count_node__.addComponentListener(__saveCountListener__)
+
+class __FileStatusListener__(DynamicControllerListenerAdapter):
+    
+    def __init__(self):
+        self.fileStatus = __file_status_node__.getValue().getStringData()
+        pass
+    
+    def valueChanged(self, controller, newValue):
+        global __file_to_add__
+        newStatus = newValue.getStringData();
+        print newStatus
+        if newStatus == "CLOSED" and (self.fileStatus == "OPEN" or self.fileStatus == "SAVING") :
+            try:
+                checkFile = File(__file_name_node__.getValue().getStringData());
+                checkFile = File(__data_folder__ + "/" + checkFile.getName());
+                __file_to_add__ = checkFile.getAbsolutePath();
+                if not checkFile.exists():
+                    slog( "The target file :" + __file_to_add__ + " can not be found", True)
+                    return
+                add_dataset()
+            except: 
+                slog( 'failed to add dataset ' + __file_to_add__, True)
+        self.fileStatus = newStatus;
+                    
+__fileStatusListener__ = __FileStatusListener__()
+__file_status_node__.addComponentListener(__fileStatusListener__)
 
 def update_buffer_log_folder():
     global __buffer_log_file__, __export_folder__, __buffer_logger__, __history_log_file__, __history_logger__
@@ -320,12 +353,13 @@ def __dispose_all__(event):
     global __sics_console_event_handler_sent__
     global __sics_console_event_handler_received__
     global __statusListener__
-    global __save_count_node__
-    global __saveCountListener__
+    global __save_count_node__, __file_status_node__
+    global __saveCountListener__, __fileStatusListener__
     sics.SicsCore.getSicsManager().proxy().removeProxyListener(__batch_status_listener__)
     __sics_console_event_handler_sent__.deactivate()
     __sics_console_event_handler_received__.deactivate()
     __save_count_node__.removeComponentListener(__saveCountListener__)
+    __file_status_node__.removeComponentListener(__fileStatusListener__)
     if __buffer_logger__:
         __buffer_logger__.close()
     if __history_logger__:
