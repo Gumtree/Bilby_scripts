@@ -93,7 +93,7 @@ def add_dataset():
     
 #    check if file has already been processed.
     if __data_file_timestamp__ == os.path.getmtime(__file_to_add__):
-        slog("file " + __file_to_add__ + " has already been processed. Skipping ...")
+        slog("file " + __file_to_add__ + " has already been processed. Skipping ..." + str(__data_file_timestamp__))
         return
     
     global __DATASOURCE__
@@ -104,8 +104,9 @@ def add_dataset():
         slog( 'error in adding dataset: ' + __file_to_add__, True)
         
     try:
-        __data_file_timestamp__ == os.path.getmtime(__file_to_add__)
-
+        __data_file_timestamp__ = os.path.getmtime(__file_to_add__)
+#        slog('last file timestamp: ' + str(__data_file_timestamp__))
+        
         def remote_path(local):
             result = local.replace('\\', '/')
             if result[0:2] == 'W:':
@@ -205,7 +206,6 @@ class __FileStatusListener__(DynamicControllerListenerAdapter):
     def valueChanged(self, controller, newValue):
         global __file_to_add__
         newStatus = newValue.getStringData();
-        print newStatus
         if newStatus == "CLOSED" and (self.fileStatus == "OPEN" or self.fileStatus == "SAVING") :
             try:
                 checkFile = File(__file_name_node__.getValue().getStringData());
