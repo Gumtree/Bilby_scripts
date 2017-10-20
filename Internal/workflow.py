@@ -518,6 +518,16 @@ class WorkflowBlock():
     def __copy__(self):
         pass
         
+    def __eq__(self, other):
+        if isinstance(other, WorkflowBlock):
+            return self.wid == other.wid
+        return False
+
+    def __ne__(self, other):
+        if isinstance(other, WorkflowBlock):
+            return self.wid != other.wid
+        return True
+        
     def dispose(self):
         self.enabled.dispose()
         self.remove.dispose()
@@ -1419,9 +1429,9 @@ class SampleTable():
     
 def save_temp_data():
     cfn = get_base_filename()
-    sics.execute('newfile HISTOGRAM_XYT')
+    sics.send_command('newfile HISTOGRAM_XYT')
     time.sleep(0.5)
-    sics.execute('save')
+    sics.send_command('save')
     t = 0
     fn = None
     while t < 5 :
@@ -1676,7 +1686,7 @@ def run_scan():
         pro_bar.selection = 0
         export_report()
         update_time()
-        sics.execute('hset /experiment/gumtree_time_estimate 0')
+        sics.send_command('hset /experiment/gumtree_time_estimate 0')
 
 def get_next_block(owb = None):
     global workflow_list
@@ -1881,7 +1891,7 @@ def update_time():
         slog('estimated time left: ' + str(int(t)) + 's')
 #        par_time.value = _get_tstring(t)
         ft = int(time.time() + t)
-        sics.execute('hset /experiment/gumtree_time_estimate ' + str(ft))
+        sics.send_command('hset /experiment/gumtree_time_estimate ' + str(ft))
         d = datetime.datetime.fromtimestamp(ft)
         td = datetime.datetime.today()
         fs = 'to finish at '
