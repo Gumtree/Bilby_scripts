@@ -1474,8 +1474,7 @@ def set_enabled(wid):
                 
 def get_workflow_block(wid):
     global workflow_list
-    for i in xrange(len(workflow_list)):
-        wb = workflow_list[i]
+    for wb in workflow_list:
         if wb.wid == wid:
             return wb
     return None
@@ -1515,6 +1514,7 @@ def toggle_scatt_enabled(wid):
     update_progress()
         
 def remove_block(wid = None):
+    global workflow_list
     if wid is None:
         if len(workflow_list) > 0:
             try:
@@ -1526,11 +1526,13 @@ def remove_block(wid = None):
     else:
         wb = get_workflow_block(wid)
         if not wb is None:
-            tt = 'Block ' + wb.title.value + ' removed'
+            tt = 'Block ' + str(wb.title.value) + ' removed'
             try:
                 workflow_list.remove(wb)
                 wb.dispose()
                 slog(tt)
+            except:
+                slog("failed to remove block " + str(wid), True)
             finally:
                 __UI__.updateUI()
                 update_progress()
