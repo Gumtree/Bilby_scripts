@@ -1994,6 +1994,20 @@ def test_exec(text):
     except:
         slog(str(traceback.format_exc().splitlines()[-1]), f_err = True)
      
+def select_stage():
+    global __number_of_sample__
+    if not confirm('This will remove all existing workflow blocks. Do you want to continue?') :
+        return
+    __number_of_sample__ = par_stage.value
+    bilby.__sampleNum__ = __number_of_sample__
+    slog('clear workflow')
+    for i in xrange(len(workflow_list)):
+        rmv = workflow_list.pop()
+        rmv.dispose()
+        
+    add_block()
+    slog(str(__number_of_sample__) + ' sample stage selected')
+    
 #def upload_html(wid):
 #    bl = get_workflow_block(wid)
 #    if not bl is None:
@@ -2004,6 +2018,11 @@ def test_exec(text):
 pro_bar = Par('progress', 0)
 pro_bar.max = 0
 pro_bar.selection = 0
+pro_bar.colspan = 2
+
+par_stage = Par('int', __number_of_sample__, options = [10, 5, 12, 1], command = 'select_stage()')
+par_stage.title = 'select sample stage'
+
 par_time = Par('string', '')
 par_time.title = 'Time Estimation'
 par_time.enabled = False
