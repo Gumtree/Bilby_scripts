@@ -403,8 +403,6 @@ try:
     bilby.__sampleNum__ = __number_of_sample__
 except:
     pass
-__number_of_sample__ = 12
-bilby.__sampleNum__ = __number_of_sample__
 
 __default_transmission_time__ = 60
 __default_scattering_time__ = 120
