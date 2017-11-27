@@ -518,6 +518,16 @@ class WorkflowBlock():
     def __copy__(self):
         pass
         
+    def __eq__(self, other):
+        if isinstance(other, WorkflowBlock):
+            return self.wid == other.wid
+        return False
+
+    def __ne__(self, other):
+        if isinstance(other, WorkflowBlock):
+            return self.wid != other.wid
+        return True
+        
     def dispose(self):
         self.enabled.dispose()
         self.remove.dispose()
@@ -1419,9 +1429,9 @@ class SampleTable():
     
 def save_temp_data():
     cfn = get_base_filename()
-    sics.execute('newfile HISTOGRAM_XYT')
+    sics.send_command('newfile HISTOGRAM_XYT')
     time.sleep(0.5)
-    sics.execute('save')
+    sics.send_command('save')
     t = 0
     fn = None
     while t < 5 :
@@ -1464,8 +1474,7 @@ def set_enabled(wid):
                 
 def get_workflow_block(wid):
     global workflow_list
-    for i in xrange(len(workflow_list)):
-        wb = workflow_list[i]
+    for wb in workflow_list:
         if wb.wid == wid:
             return wb
     return None
@@ -1505,6 +1514,7 @@ def toggle_scatt_enabled(wid):
     update_progress()
         
 def remove_block(wid = None):
+    global workflow_list
     if wid is None:
         if len(workflow_list) > 0:
             try:
@@ -1516,11 +1526,13 @@ def remove_block(wid = None):
     else:
         wb = get_workflow_block(wid)
         if not wb is None:
-            tt = 'Block ' + wb.title.value + ' removed'
+            tt = 'Block ' + str(wb.title.value) + ' removed'
             try:
                 workflow_list.remove(wb)
                 wb.dispose()
                 slog(tt)
+            except:
+                slog("failed to remove block " + str(wid), True)
             finally:
                 __UI__.updateUI()
                 update_progress()
@@ -1676,7 +1688,7 @@ def run_scan():
         pro_bar.selection = 0
         export_report()
         update_time()
-        sics.execute('hset /experiment/gumtree_time_estimate 0')
+        sics.send_command('hset /experiment/gumtree_time_estimate 0')
 
 def get_next_block(owb = None):
     global workflow_list
@@ -1881,7 +1893,7 @@ def update_time():
         slog('estimated time left: ' + str(int(t)) + 's')
 #        par_time.value = _get_tstring(t)
         ft = int(time.time() + t)
-        sics.execute('hset /experiment/gumtree_time_estimate ' + str(ft))
+        sics.send_command('hset /experiment/gumtree_time_estimate ' + str(ft))
         d = datetime.datetime.fromtimestamp(ft)
         td = datetime.datetime.today()
         fs = 'to finish at '
@@ -1980,6 +1992,20 @@ def test_exec(text):
     except:
         slog(str(traceback.format_exc().splitlines()[-1]), f_err = True)
      
+def select_stage():
+    global __number_of_sample__
+    if not confirm('This will remove all existing workflow blocks. Do you want to continue?') :
+        return
+    __number_of_sample__ = par_stage.value
+    bilby.__sampleNum__ = __number_of_sample__
+    slog('clear workflow')
+    for i in xrange(len(workflow_list)):
+        rmv = workflow_list.pop()
+        rmv.dispose()
+        
+    add_block()
+    slog(str(__number_of_sample__) + ' sample stage selected')
+    
 #def upload_html(wid):
 #    bl = get_workflow_block(wid)
 #    if not bl is None:
@@ -1990,6 +2016,11 @@ def test_exec(text):
 pro_bar = Par('progress', 0)
 pro_bar.max = 0
 pro_bar.selection = 0
+pro_bar.colspan = 2
+
+par_stage = Par('int', __number_of_sample__, options = [10, 5, 12, 1], command = 'select_stage()')
+par_stage.title = 'select sample stage'
+
 par_time = Par('string', '')
 par_time.title = 'Time Estimation'
 par_time.enabled = False
