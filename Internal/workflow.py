@@ -407,7 +407,7 @@ except:
 __default_transmission_time__ = 60
 __default_scattering_time__ = 120
 
-__script__.numColumns = 2
+__script__.numColumns = 4
 
 workflow_list = []
 __workflow_id__ = 0
@@ -432,7 +432,7 @@ class WorkflowBlock():
 #        tt = 'Workflow Block #' + str(self.wid)
         tt = _default_config_name + str(self.wid)
         gc = Group('Workflow Block #' + str(self.wid))
-        gc.colspan = 2
+        gc.colspan = 4
         gc.numColumns = 4
         cenabled = Par('bool', True, command \
                        = 'set_enabled(' + str(self.wid) + ')')
@@ -2016,20 +2016,26 @@ def select_stage():
 pro_bar = Par('progress', 0)
 pro_bar.max = 0
 pro_bar.selection = 0
-pro_bar.colspan = 2
+pro_bar.colspan = 4
 
-par_stage = Par('int', __number_of_sample__, options = [10, 5, 12, 1], command = 'select_stage()')
+par_stage = Par('int', __number_of_sample__, options = [10, 5, 12, 1])
 par_stage.title = 'select sample stage'
+
+act_apply = Act('select_stage()', 'Apply the change')
+act_apply.tool_tip = 'Click to apply the selected sample stage'
 
 par_time = Par('string', '')
 par_time.title = 'Time Estimation'
 par_time.enabled = False
+par_time.colspan = 2
 
 act_load = Act('load_workflow()', 'Load Workflow')
 act_load.tool_tip = 'Click to load workflow from a file'
+act_load.colspan = 2
 act_exp = Act('export_workflow()', 'Export Workflow')
 act_exp.independent = True
 act_exp.tool_tip = 'Click to save current workflow to the file system'
+act_exp.colspan = 2
 #act_rmv = Act('remove_block()', 'Remove Workflow Block')
 #act_rmv.independent = True
 act_pause = Act('pause_workflow()', 'Click to Pause')
@@ -2037,6 +2043,7 @@ act_pause.type = 'TOGGLE'
 act_pause.enabled = False
 act_pause.independent = True 
 act_pause.tool_tip = 'Click to pause/unpause the workflow'
+act_pause.colspan = 2
 #act_stop = Act('stop_workflow()', 'Stop/Interrupt')
 #act_stop.independent = True
 #act_stop.no_interrupt_check = True 
@@ -2044,12 +2051,15 @@ act_next = Act('quit_counting()', 'Move to Next Step')
 act_next.independent = True
 act_next.enabled = False
 act_next.tool_tip = 'Click to quit counting, and move to the next collection point'
+act_next.colspan = 2
 
 act_add = Act('add_block()', 'Add Workflow Block')
 act_add.independent = True 
 act_add.tool_tip = 'Click to add a new block to the end of the workflow'
+act_add.colspan = 2
 act_run = Act('run_scan()', 'Run Bilby Workflow')
 act_run.tool_tip = 'Click to run the workflow'
+act_run.colspan = 2
 #act_run.colspan = 2
     
 #def add_sample(table, i):
