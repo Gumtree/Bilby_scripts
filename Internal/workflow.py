@@ -1936,7 +1936,7 @@ def _get_tstring(t):
                     ms = 'minutes'
                 else:
                     ms = 'minute'
-                return ("%d " % h) + hs + ("%d " % m) + ms
+                return ("%d " % h) + hs + (" %d " % m) + ms
             else:
                 return ("%d " % h) + hs
         return "%d hours" % round(t / 3600)
