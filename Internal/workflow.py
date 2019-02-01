@@ -26,6 +26,7 @@ import socket
 from xml.etree.ElementTree import Element, SubElement, ElementTree, tostring
 from gumpy.commons.logger import n_logger
 from gumpy.lib import enum
+import random
 
 # Script control setup area
 # script info
@@ -410,7 +411,7 @@ __default_scattering_time__ = 120
 __script__.numColumns = 4
 
 workflow_list = []
-__workflow_id__ = 0
+__workflow_seq__ = 0
 __report_folder__ = 'W:/data/current/reports/pWorkflow'
 _is_running = False
 _start_timestamp = 0
@@ -424,14 +425,16 @@ _default_config_name = "L1=#_L2=#_ctn=#_name=WB"
 
 class WorkflowBlock():
     def __init__(self):
-        global __workflow_id__
-        self.wid = __workflow_id__
-        __workflow_id__ += 1
+        global __workflow_seq__
+#        self.wid = uuid.uuid1()
+        self.wid = get_next_wid()
+        __workflow_seq__ += 1
+        self.seq = __workflow_seq__
 #        self.config = config
 #        self.samples = samples
 #        tt = 'Workflow Block #' + str(self.wid)
-        tt = _default_config_name + str(self.wid)
-        gc = Group('Workflow Block #' + str(self.wid))
+        tt = _default_config_name + str(self.seq)
+        gc = Group('Workflow Block #' + str(self.seq))
         gc.colspan = 4
         gc.numColumns = 4
         cenabled = Par('bool', True, command \
@@ -507,9 +510,9 @@ class WorkflowBlock():
         self.table.set_enabled(flag)
         self.ctest.enabled = flag
         if flag:
-            slog('block #' + str(self.wid) + ' is enabled')
+            slog('block #' + str(self.seq) + ' is enabled')
         else:
-            slog('block #' + str(self.wid) + ' is disabled')
+            slog('block #' + str(self.seq) + ' is disabled')
         update_progress()
         
     def is_enabled(self):
@@ -611,11 +614,18 @@ class WorkflowBlock():
         self.table.t5.value = rep['scatt_enabled'] 
         for id in self.table.samples:
             sp = self.table.samples[id]
-            sp.name_text.value = rep['name_' + str(id)] 
-            sp.do_trans.value = rep['trans_enabled_' + str(id)] 
-            sp.trans_time.value = rep['trans_time_' + str(id)] 
-            sp.do_scatt.value = rep['scatt_enabled_' + str(id)] 
-            sp.scatt_time.value = rep['scatt_time_' + str(id)]
+            try:
+                sp.name_text.value = rep['name_' + str(id)] 
+                sp.do_trans.value = rep['trans_enabled_' + str(id)] 
+                sp.trans_time.value = rep['trans_time_' + str(id)] 
+                sp.do_scatt.value = rep['scatt_enabled_' + str(id)] 
+                sp.scatt_time.value = rep['scatt_time_' + str(id)]
+            except:
+                sp.name_text.value = '' 
+                sp.do_trans.value = False 
+                sp.trans_time.value = rep['trans_time'] 
+                sp.do_scatt.value = False 
+                sp.scatt_time.value = rep['scatt_time']
     
     def need_to_run(self):
 #        for i in self.table.samples:
@@ -1442,6 +1452,13 @@ def save_temp_data():
         t += 0.5
     return fn
 
+def get_next_wid():
+    global workflow_list
+    wid = random.randint(1, 1e12)
+    for w in workflow_list :
+        if wid == w.wid:
+            return get_next_wid()
+    return wid
     
 #def update_title(wid):
 #    b = get_workflow_block(wid)
@@ -1483,24 +1500,24 @@ def change_trans_time(wid):
     wb = get_workflow_block(wid)
     if not wb is None:
         wb.table.update_trans_time()
-    slog('batch change transmission preset for all samples of block #' + str(wid))
-    update_time()
+        slog('batch change transmission preset for all samples of block #' + str(wb.seq))
+        update_time()
 
 def change_scatt_time(wid):
     wb = get_workflow_block(wid)
     if not wb is None:
         wb.table.update_scatt_time()
-    slog('batch change scattering preset for all samples of block #' + str(wid))
-    update_time()
+        slog('batch change scattering preset for all samples of block #' + str(wb.seq))
+        update_time()
             
 def toggle_trans_enabled(wid):
     wb = get_workflow_block(wid)
     if not wb is None:
         wb.table.toggle_trans_enabled()
     if wb.table.t3.value:
-        slog('enable transmission for all samples of block #' + str(wid))
+        slog('enable transmission for all samples of block #' + str(wb.seq))
     else:
-        slog('disable transmission for all samples of block #' + str(wid))
+        slog('disable transmission for all samples of block #' + str(wb.seq))
     update_progress()
 
 def toggle_scatt_enabled(wid):
@@ -1508,9 +1525,9 @@ def toggle_scatt_enabled(wid):
     if not wb is None:
         wb.table.toggle_scatt_enabled()
     if wb.table.t5.value:
-        slog('enable scattering for all samples of block #' + str(wb.wid))
+        slog('enable scattering for all samples of block #' + str(wb.seq))
     else:
-        slog('disable scattering for all samples of block #' + str(wb.wid))
+        slog('disable scattering for all samples of block #' + str(wb.seq))
     update_progress()
         
 def remove_block(wid = None):
@@ -1575,7 +1592,7 @@ def insert_block(wid):
     else:
         wb = WorkflowBlock()
         workflow_list.insert(idx + 1, wb)
-        slog('block #' + str(wb.wid) + ' inserted')
+        slog('block #' + str(wb.seq) + ' inserted')
         try:
             wb.group.moveAfterObject(old.group)
             wb.config.value = old.config.value
@@ -1608,7 +1625,7 @@ def add_block():
         old = workflow_list[-1]
     wb = WorkflowBlock()
     workflow_list.append(wb)
-    slog("add new workflow block #" + str(wb.wid))
+    slog("add new workflow block " + str(wb.seq))
     try:
         if not old is None:
             wb.config.value = old.config.value
@@ -1673,7 +1690,7 @@ def run_scan():
             if cwb.is_enabled() :
                 cwb.run()
             else:
-                slog('block #' + str(cwb.wid) + ' is disabled, skipped')
+                slog('block #' + str(cwb.seq) + ' is disabled, skipped')
             cwb = get_next_block(cwb)
         slog('workflow is finished')
     except :
@@ -1702,10 +1719,16 @@ def get_next_block(owb = None):
             idx = workflow_list.index(owb)
         except:
             slog('get_next_block(): failed to find block #' + str(owb.wid), True)
-        if idx + 1 >= len(workflow_list):
-            return None
-        else:
-            return workflow_list[idx + 1]
+#        if idx + 1 >= len(workflow_list):
+#            return None
+#        else:
+#            return workflow_list[idx + 1]
+        while idx < len(workflow_list) - 1 :
+            idx += 1
+            nwb = workflow_list[idx]
+            if nwb != owb :
+                return nwb
+        return None
 
             
 def load_config(wid):
@@ -1747,7 +1770,7 @@ def load_config(wid):
                 if fn.lower().endswith('.cfg'):
                     sn = sn[:-4]
                 wb.title.value = sn
-                slog('load configuration to block #' + str(wid) + ' from ' + str(fn))
+                slog('load configuration to block #' + str(wb.seq) + ' from ' + str(fn))
         else:
             slog('failed to find block #' + str(wid), True)
     else:
@@ -1851,6 +1874,7 @@ def export_workflow(path = None):
 
 def export_report():
     global __export_folder__
+    global workflow_list
     root = Element('workflow')
     tree = ElementTree(root)
     for bl in workflow_list:
@@ -1886,6 +1910,7 @@ def step_progress():
     
 def update_time():
     global _start_timestamp
+    global workflow_list
     if _is_running:
         t = 0
         for wb in workflow_list:
@@ -1994,6 +2019,7 @@ def test_exec(text):
      
 def select_stage():
     global __number_of_sample__
+    global workflow_list
     if not confirm('This will remove all existing workflow blocks. Do you want to continue?') :
         return
     __number_of_sample__ = par_stage.value
