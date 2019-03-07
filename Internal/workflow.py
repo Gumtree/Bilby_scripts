@@ -184,6 +184,10 @@ class __SaveCountListener__(DynamicControllerListenerAdapter):
             if newCount == 0:
                 return
             try:
+                __file_name_node__.getValue(True)
+            except:
+                pass
+            try:
                 checkFile = File(__file_name_node__.getValue().getStringData());
                 checkFile = File(__data_folder__ + "/" + checkFile.getName());
                 __file_to_add__ = checkFile.getAbsolutePath();
