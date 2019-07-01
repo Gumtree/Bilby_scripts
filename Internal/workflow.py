@@ -31,7 +31,7 @@ import random
 # Script control setup area
 # script info
 __script__.title = 'Bilby Workflow'
-__script__.version = '1.0'
+__script__.version = '2.0'
 
 sics.ready = False
 
@@ -595,11 +595,13 @@ class WorkflowBlock():
         rep['scatt_setup'] = self.table.scatt_setup.value
         rep['trans_time'] = self.table.trans_time.value
         rep['scatt_time'] = self.table.scatt_time.value
+        rep['thickness'] = self.table.thickness.value
         rep['trans_enabled'] = self.table.t3.value
         rep['scatt_enabled'] = self.table.t5.value
         for id in self.table.samples:
             sp = self.table.samples[id]
             rep['name_' + str(id)] = sp.name_text.value
+            rep['thickness_' + str(id)] = sp.thickness.value
             rep['trans_enabled_' + str(id)] = sp.do_trans.value
             rep['trans_time_' + str(id)] = sp.trans_time.value
             rep['scatt_enabled_' + str(id)] = sp.do_scatt.value
@@ -613,13 +615,15 @@ class WorkflowBlock():
         self.table.trans_setup.value = rep['trans_setup'] 
         self.table.scatt_setup.value = rep['scatt_setup'] 
         self.table.trans_time.value = rep['trans_time'] 
-        self.table.scatt_time.value = rep['scatt_time'] 
+        self.table.scatt_time.value = rep['scatt_time']
+        self.table.thickness.value = rep['thickness'] 
         self.table.t3.value = rep['trans_enabled'] 
         self.table.t5.value = rep['scatt_enabled'] 
         for id in self.table.samples:
             sp = self.table.samples[id]
             try:
                 sp.name_text.value = rep['name_' + str(id)] 
+                sp.thickness.value = rep['thickness_' + str(id)]
                 sp.do_trans.value = rep['trans_enabled_' + str(id)] 
                 sp.trans_time.value = rep['trans_time_' + str(id)] 
                 sp.do_scatt.value = rep['scatt_enabled_' + str(id)] 
@@ -717,6 +721,8 @@ class Sample():
         s1_idx.width = 24
         s1_name = Par('string', '')
         s1_name.title = ''
+        s1_thickness = Par('float', 0)
+        s1_thickness.title = ''
         s1_trans = Par('bool', True, command = 'update_progress()')
         s1_trans.title = ''
         s1_trans_time = Par('float', __default_transmission_time__, command = 'update_progress()')
@@ -733,6 +739,7 @@ class Sample():
         s1_scatt_res.width = 120
         self.id_label = s1_idx
         self.name_text = s1_name
+        self.thickness = s1_thickness
         self.do_trans = s1_trans
         self.trans_time = s1_trans_time
         self.trans_res = s1_trans_res
@@ -749,6 +756,7 @@ class Sample():
     def dispose(self):
         self.id_label.dispose()
         self.name_text.dispose()
+        self.thickness.dispose()
         self.do_trans.dispose()
         self.trans_time.dispose()
         self.trans_res.dispose()
@@ -785,7 +793,7 @@ class Sample():
                 act_next.enabled = True
                 act_pause.enabled = True
                 old_filename = get_base_filename()
-                scan10(self.idx, self.trans_time.value, self.name_text.value)
+                scan10(self.idx, self.trans_time.value, self.name_text.value, self.thickness.value)
                 self.trans_res.value = get_new_filename(old_filename)
                 step_progress()
                 self.trans_res.highlight = False
@@ -857,7 +865,7 @@ class Sample():
                 act_next.enabled = True
                 act_pause.enabled = True
                 old_filename = get_base_filename()
-                scan10(self.idx, self.scatt_time.value, self.name_text.value)
+                scan10(self.idx, self.scatt_time.value, self.name_text.value, self.thickness.value)
                 self.scatt_res.value = get_new_filename(old_filename)
                 step_progress()
                 self.scatt_res.highlight = False
@@ -907,6 +915,7 @@ class Sample():
     def set_enabled(self, flag):
         self.id_label.enabled = flag
         self.name_text.enabled = flag
+        self.thickness.enabled = flag
         self.do_trans.enabled = flag
         self.trans_time.enabled = flag
         self.trans_res.enabled = flag
@@ -991,6 +1000,7 @@ class Sample():
             sp = SubElement(parent, 'sample')
             sp.set('index', str(self.idx))
             sp.set('name', self.name_text.value.strip())
+            sp.set('thickness', str(self.thickness.value))
             trans = SubElement(sp, 'transmission')
             text = self.trans_res.value.strip()
             trans.set('runID', get_run_id(text))
@@ -1065,30 +1075,39 @@ class SampleTable():
         self.samples = dict()
         self.group = Group(name)
         self.group.hideTitle = True
-        self.group.numColumns = 8
+        self.group.numColumns = 9
         self.group.colspan = 4
         trans_setup = Par('string', '')
         trans_setup.title = 'transmission setup'
-        trans_setup.colspan = 4
+        trans_setup.colspan = 5
         trans_setup.height = 40
         scatt_setup = Par('string', '')
         scatt_setup.title = 'scattering setup'
         scatt_setup.colspan = 3
         scatt_setup.height = 40
         space1 = Par('space')
+        
         trans_time = Par('float', '60', command='change_trans_time(' \
                          + str(wid) + ')')
         trans_time.title = 'transmission time'
-        trans_time.colspan = 4
+        trans_time.colspan = 5
         scatt_time = Par('float', '120', command='change_scatt_time(' \
                          + str(wid) + ')')
         scatt_time.title = 'scattering time'
         scatt_time.colspan = 3
         space2 = Par('space')
+        
+        thickness = Par('float', 0, command='change_thickness({})'.format(wid))
+        thickness.title = 'sample thickness (cm)'
+        thickness.colspan = 5
+        space3 = Par('space')
+        space3.colspan = 4
          
         tit_1 = Par('label', 'idx')
         tit_1.width = 24
         tit_2 = Par('label', 'Sample Name')
+        tit_thick = Par('label', 'Thickness (cm)')
+        
         tit_3 = Par('bool', True, command='toggle_trans_enabled(' \
                          + str(wid) + ')')
         tit_3.title = ''
@@ -1101,19 +1120,22 @@ class SampleTable():
         tit_6.colspan = 2
         self.trans_time = trans_time
         self.scatt_time = scatt_time
+        self.thickness = thickness
         self.trans_setup = trans_setup
         self.scatt_setup = scatt_setup
         self.space1 = space1
         self.space2 = space2
+        self.space3 = space3
         self.t1 = tit_1
         self.t2 = tit_2
+        self.thick_title = tit_thick
         self.t3 = tit_3
         self.t4 = tit_4
         self.t5 = tit_5
         self.t6 = tit_6
         self.group.add(trans_setup, scatt_setup, space1, trans_time, \
-                       scatt_time, space2, \
-                       tit_1, tit_2, tit_3, \
+                       scatt_time, space2, thickness, space3, \
+                       tit_1, tit_2, tit_thick, tit_3, \
                        tit_4, tit_5, tit_6)
         for i in xrange(__number_of_sample__) :
             self.add_sample(i + 1)
@@ -1131,7 +1153,7 @@ class SampleTable():
         self.samples[id] = sample
 #        sample.do_trans.command = 'redo_trans(' + str(self.wid) + ', ' + str(id) + ')'
 #        sample.do_scatt.command = 'redo_scatt(' + str(self.wid) + ', ' + str(id) + ')'
-        self.group.add(sample.id_label, sample.name_text, sample.do_trans, sample.trans_time, \
+        self.group.add(sample.id_label, sample.name_text, sample.thickness, sample.do_trans, sample.trans_time, \
                  sample.trans_res, sample.do_scatt, sample.scatt_time, sample.scatt_res)
     
     def test_run(self):
@@ -1350,6 +1372,7 @@ class SampleTable():
         self.t6.enabled = flag
         self.trans_time.enabled = flag
         self.scatt_time.enabled = flag
+        self.thickness.enabled = flag
         self.trans_setup.enabled = flag
         self.scatt_setup.enabled = flag
         for i in self.samples:
@@ -1362,6 +1385,10 @@ class SampleTable():
     def update_scatt_time(self):
         for i in self.samples:
             self.samples[i].scatt_time.value = self.scatt_time.value
+        
+    def update_thickness(self):
+        for i in self.samples:
+            self.samples[i].thickness.value = self.thickness.value
         
     def toggle_trans_enabled(self):
         for i in self.samples:
@@ -1376,12 +1403,14 @@ class SampleTable():
             self.samples[i].dispose()
         self.t1.dispose()
         self.t2.dispose()
+        self.thick_title.dispose()
         self.t3.dispose()
         self.t4.dispose()
         self.t5.dispose()
         self.t6.dispose()
         self.trans_time.dispose()
         self.scatt_time.dispose()
+        self.thickness.dispose()
         self.group.dispose()
         self.trans_setup.dispose()
         self.scatt_setup.dispose()
@@ -1513,7 +1542,13 @@ def change_scatt_time(wid):
         wb.table.update_scatt_time()
         slog('batch change scattering preset for all samples of block #' + str(wb.seq))
         update_time()
-            
+
+def change_thickness(wid):
+    wb = get_workflow_block(wid)
+    if not wb is None:
+        wb.table.update_thickness()
+        slog('batch change thickness value for all samples of block #' + str(wb.seq))
+                
 def toggle_trans_enabled(wid):
     wb = get_workflow_block(wid)
     if not wb is None:
@@ -1607,12 +1642,14 @@ def insert_block(wid):
             wb.table.t5.value = old.table.t5.value
             wb.table.trans_time.value = old.table.trans_time.value
             wb.table.scatt_time.value = old.table.scatt_time.value
+            wb.table.thickness.value = old.table.thickness.value
             wb.table.trans_setup.value = old.table.trans_setup.value
             wb.table.scatt_setup.value = old.table.scatt_setup.value
             for i in wb.table.samples:
                 sample = wb.table.samples[i]
                 old_sample = old.table.samples[i]
                 sample.name_text.value = old_sample.name_text.value
+                sample.thickness.value = old_sample.thickness.value
                 sample.do_trans.value = old_sample.do_trans.value
                 sample.trans_time.value = old_sample.trans_time.value
                 sample.do_scatt.value = old_sample.do_scatt.value
@@ -1640,12 +1677,14 @@ def add_block():
             wb.table.t5.value = old.table.t5.value
             wb.table.trans_time.value = old.table.trans_time.value
             wb.table.scatt_time.value = old.table.scatt_time.value
+            wb.table.thickness.value = old.table.thickness.value
             wb.table.trans_setup.value = old.table.trans_setup.value
             wb.table.scatt_setup.value = old.table.scatt_setup.value
             for i in wb.table.samples:
                 sample = wb.table.samples[i]
                 old_sample = old.table.samples[i]
                 sample.name_text.value = old_sample.name_text.value
+                sample.thickness.value = old_sample.thickness.value
                 sample.do_trans.value = old_sample.do_trans.value
                 sample.trans_time.value = old_sample.trans_time.value
                 sample.do_scatt.value = old_sample.do_scatt.value
@@ -2048,7 +2087,7 @@ pro_bar.max = 0
 pro_bar.selection = 0
 pro_bar.colspan = 4
 
-par_stage = Par('int', __number_of_sample__, options = [10, 5, 12, 1])
+par_stage = Par('int', __number_of_sample__, options = [10, 5, 12, 6, 1])
 par_stage.title = 'select sample stage'
 
 act_apply = Act('select_stage()', 'Apply the change')
