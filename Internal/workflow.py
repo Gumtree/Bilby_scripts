@@ -1416,6 +1416,7 @@ class SampleTable():
         self.scatt_setup.dispose()
         self.space1.dispose()
         self.space2.dispose()
+        self.space3.dispose()
         
     def append_xml(self, parent):
         for i in sorted(self.samples):
