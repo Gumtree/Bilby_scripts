@@ -611,46 +611,80 @@ class WorkflowBlock():
     def from_rep(self, rep):
         if rep.has_key('title'):
             self.title.value = rep['title']
+        else:
+            self.title.value = ''
 #        self.group.name = self.title.value
         if rep.has_key('config'):
             self.config.value = rep['config']
+        else:
+            self.config.value = ''
         if rep.has_key('trans_setup'): 
             self.table.trans_setup.value = rep['trans_setup']
+        else:
+            self.table.trans_setup.value = ''
         if rep.has_key('scatt_setup'): 
             self.table.scatt_setup.value = rep['scatt_setup']
+        else:
+            self.table.scatt_setup.value = ''
         if rep.has_key('trans_time'): 
             self.table.trans_time.value = rep['trans_time']
+        else:
+            self.table.trans_time.value = 60
         if rep.has_key('scatt_time'): 
             self.table.scatt_time.value = rep['scatt_time']
+        else:
+            self.table.scatt_time.value = 60
         if rep.has_key('thickness'):
             self.table.thickness.value = rep['thickness']
+        else:
+            self.table.thickness.value = 0
         if rep.has_key('trans_enabled'): 
             self.table.t3.value = rep['trans_enabled']
+        else:
+            self.table.t3.value = True
         if rep.has_key('scatt_enabled'): 
-            self.table.t5.value = rep['scatt_enabled'] 
+            self.table.t5.value = rep['scatt_enabled']
+        else:
+            self.table.t5.value = True
         for id in self.table.samples:
             sp = self.table.samples[id]
             try:
                 if rep.has_key('name_' + str(id)):
                     sp.name_text.value = rep['name_' + str(id)]
+                else:
+                    sp.name_text.value = ''
                 if rep.has_key('thickness_' + str(id)):
                     sp.thickness.value = rep['thickness_' + str(id)]
+                else:
+                    sp.thickness.value = 0
                 if rep.has_key('trans_enabled_' + str(id)):
                     sp.do_trans.value = rep['trans_enabled_' + str(id)]
+                else:
+                    sp.do_trans.value = True
                 if rep.has_key('trans_time_' + str(id)): 
                     sp.trans_time.value = rep['trans_time_' + str(id)]
+                else:
+                    sp.trans_time.value = 60
                 if rep.has_key('scatt_enabled_' + str(id)): 
                     sp.do_scatt.value = rep['scatt_enabled_' + str(id)]
+                else:
+                    sp.do_scatt.value = True
                 if rep.has_key('scatt_time_' + str(id)): 
                     sp.scatt_time.value = rep['scatt_time_' + str(id)]
+                else:
+                    sp.scatt_time.value = 60
             except:
                 sp.name_text.value = '' 
                 sp.do_trans.value = False 
                 if rep.has_key('trans_time'):
                     sp.trans_time.value = rep['trans_time']
+                else:
+                    sp.trans_time.value = 60
                 sp.do_scatt.value = False
                 if rep.has_key('scatt_time'): 
                     sp.scatt_time.value = rep['scatt_time']
+                else:
+                    sp.scatt_time.value = 60
     
     def need_to_run(self):
 #        for i in self.table.samples:
