@@ -1083,7 +1083,7 @@ class Sample():
             td = SubElement(tr, 'td')
             td.text = str(self.name_text.value.strip())
             td = SubElement(tr, 'td')
-            td.text = str(self.thickness.value)
+            td.text = str('%.2f' % self.thickness.value)
             td = SubElement(tr, 'td')
             text = get_short_pdfname(self.trans_res.value.strip())
             if text.startswith('*'):
@@ -1492,6 +1492,7 @@ class SampleTable():
         th = SubElement(tr, 'th')
         th.set('colspan', '5')
         pre = SubElement(th, 'pre')
+        pre.set("style", "margin-top: 0px;margin-bottom: 0px;text-align:left")
         pre.text = title
         
         tr = SubElement(table, 'tr')
