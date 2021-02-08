@@ -31,7 +31,7 @@ import random
 # Script control setup area
 # script info
 __script__.title = 'Bilby Workflow'
-__script__.version = '2.0'
+__script__.version = '2.1'
 
 sics.ready = False
 
@@ -752,7 +752,7 @@ class WorkflowBlock():
 
     def get_html(self):
         if self.enabled.value:
-            html = self.table.get_html(self.title.value)
+            html = self.table.get_html(self.config.value)
             try:
                 span = Element('span')
                 span.set('class', 'class_span_tablefoot')
@@ -1082,6 +1082,8 @@ class Sample():
             td.text = str(self.idx)
             td = SubElement(tr, 'td')
             td.text = str(self.name_text.value.strip())
+            td = SubElement(tr, 'td')
+            td.text = str(self.thickness.value)
             td = SubElement(tr, 'td')
             text = get_short_pdfname(self.trans_res.value.strip())
             if text.startswith('*'):
@@ -1485,11 +1487,12 @@ class SampleTable():
         table.set('style', 'width:100%; word-wrap:break-word')
         tr = SubElement(table, 'tr')
         th = SubElement(tr, 'th')
-        th.set('colspan', '2')
+        th.set('colspan', '3')
         th.text = strftime("%Y-%m-%dT%H:%M:%S", localtime())
         th = SubElement(tr, 'th')
         th.set('colspan', '5')
-        th.text = title
+        pre = SubElement(th, 'pre')
+        pre.text = title
         
         tr = SubElement(table, 'tr')
         th = SubElement(tr, 'th')
@@ -1498,6 +1501,9 @@ class SampleTable():
         th = SubElement(tr, 'th')
         th.set("style", "width: 18%;")
         th.text = 'Sample Name'
+        th = SubElement(tr, 'th')
+        th.set("style", "width: 10%;")
+        th.text = 'Thickness'
         th = SubElement(tr, 'th')
         th.set("style", "width: 14%;")
         th.text = 'Transmission'
@@ -1511,7 +1517,7 @@ class SampleTable():
         th.set("style", "width: 8%;")
         th.text = 'Preset'
         th = SubElement(tr, 'th')
-        th.set("style", "width: 30%;")
+        th.set("style", "width: 20%;")
         th.text = 'Comment'
         
         for i in sorted(self.samples):
