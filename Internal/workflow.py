@@ -35,9 +35,9 @@ __script__.version = '2.1'
 
 sics.ready = False
 
-__data_folder__ = 'W:/data/current'
+__data_folder__ = 'W:/cycle/current/data/sics'
 #__data_folder__ = 'Y:/testing/bilby/sicsdata'
-__export_folder__ = 'W:/data/current/reports'
+__export_folder__ = 'W:/cycle/current/data/sics/reports'
 __buffer_log_file__ = __export_folder__
 Dataset.__dicpath__ = get_absolute_path('/Internal/path_table')
 System.setProperty('sics.data.path', __data_folder__)
@@ -111,9 +111,9 @@ def add_dataset():
         def remote_path(local):
             result = local.replace('\\', '/')
             if result[0:2] == 'W:':
-                result = "/mnt/nbi_experiment_data/bilby" + result[2:]
+                result = "/mnt/zfstor1/bilby" + result[2:]
             elif result[0:2] == 'V:':
-                result = "/mnt/nbi_experiment_hsdata/bilby/hsdata" + result[2:]
+                result = "/mnt/zfstor1/bilby" + result[2:]
                 
             return result
         
@@ -131,7 +131,7 @@ def add_dataset():
         
         if len(ds) > 1:
             datasetNumbers = datasetNumbers[0]
-        binFile = "/mnt/nbi_experiment_hsdata/bilby/hsdata/%s/DATASET_%i/EOS.bin" % (daqDirName, int(datasetNumbers))
+        binFile = "/mnt/zfstor1/bilby/cycle/current/data/histserv/%s/DATASET_%i/EOS.bin" % (daqDirName, int(datasetNumbers))
 
         msg = "SRC:\"%s\",\"%s\"\r\nDST:\"%s\"\r\n" % (hdfFile, binFile, tarFile)
         
