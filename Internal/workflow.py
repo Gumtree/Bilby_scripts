@@ -1634,7 +1634,8 @@ def remove_block(wid = None):
         if len(workflow_list) > 0:
             try:
                 rmv = workflow_list.pop()
-                rmv.dispose()
+                if rmv != None:
+                    rmv.dispose()
             finally:
                 __UI__.updateUI()
                 update_progress()
@@ -1693,6 +1694,9 @@ def insert_block(wid):
         slog('block #' + str(wb.seq) + ' inserted')
         try:
             wb.group.moveAfterObject(old.group)
+        except:
+            slog('failed to put block to correct index', True)
+        try:
             wb.config.value = old.config.value
             config_name = old.title.value
             if not config_name.startswith(_default_config_name):
