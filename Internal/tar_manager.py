@@ -146,7 +146,7 @@ def submit():
 
     hdfInput = p_hdf.value
     binInput = p_bin.value 
-    tarFile = p_name.value
+    tarFile = "/mnt/zfstor1/bilby/cycle/current/data/sics/" + p_name.value
     
     try:
 #        __data_file_timestamp__ = os.path.getmtime(__file_to_add__)
