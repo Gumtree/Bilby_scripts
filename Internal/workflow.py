@@ -93,12 +93,12 @@ def add_dataset():
         return
     
 #    check if file has already been processed.
-    if __data_file_timestamp__ == os.path.getmtime(__file_to_add__):
-        slog("file " + __file_to_add__ + " has already been processed. Skipping ..." + str(__data_file_timestamp__))
-        return
     
     global __DATASOURCE__
     try:
+        if __data_file_timestamp__ == os.path.getmtime(__file_to_add__):
+            slog("file " + __file_to_add__ + " has already been processed. Skipping ..." + str(__data_file_timestamp__))
+            return
 #        __DATASOURCE__.addDataset(__file_to_add__, True)
         slog('adding ' + str(__file_to_add__))
     except:
@@ -191,9 +191,13 @@ class __SaveCountListener__(DynamicControllerListenerAdapter):
                 checkFile = File(__file_name_node__.getValue().getStringData());
                 checkFile = File(__data_folder__ + "/" + checkFile.getName());
                 __file_to_add__ = checkFile.getAbsolutePath();
-                if not checkFile.exists():
-                    slog( "The target file :" + __file_to_add__ + " can not be found", True)
-                    return
+                wct = 0
+                while not checkFile.exists():
+                    wct += 1
+                    if wct > 5 :
+                        slog( "The target file :" + __file_to_add__ + " can not be found", True)
+                        break
+                    time.sleep(0.5)
                 add_dataset()
             except: 
                 slog( 'failed to add dataset ' + __file_to_add__, True)
