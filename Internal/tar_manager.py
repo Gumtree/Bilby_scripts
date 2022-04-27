@@ -8,7 +8,7 @@ import socket, os, glob
 
 #_binFile = "/mnt/zfstor1/bilby/cycle/current/data/histserv/%s/DATASET_%i/EOS.bin"
 # % (daqDirName, int(datasetNumbers))
-_default_path = 'W:/cycle/current/data/sics/'
+_default_path = 'Z:/cycle/current/data/sics/'
 
 g = Group('Tar Manager')
 #g.numColumns = 2
@@ -47,8 +47,10 @@ g_tar = Group('tar')
 g_tar.hideTitle = True
 g_tar.numColumns = 2
 
-p_tar = Par('string', _default_path, options = [_default_path])
+#p_tar = Par('string', _default_path, options = [_default_path])
+p_tar = Par('string', _default_path)
 p_tar.title = 'Tar File'
+p_tar.enabled = False
 
 p_name = Par('file', '')
 p_name.title = ''
@@ -162,10 +164,10 @@ def submit():
         
         is_remote = True
         hdfInput = hdfInput.replace('\\', '/')
-        if hdfInput[0:2] != "W:":
-            is_remote = False
-        else:
-            hdfFile = "/mnt/zfstor1/bilby" + hdfInput[2:]
+#        if hdfInput[0:2] != "Z:":
+#            is_remote = False
+#        else:
+        hdfFile = "/mnt/zfstor1/bilby" + hdfInput[2:]
         binInput = binInput.replace('\\', '/')
         if binInput[0:2] != "V:":
             is_remote = False

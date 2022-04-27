@@ -35,9 +35,9 @@ __script__.version = '2.1'
 
 sics.ready = False
 
-__data_folder__ = 'W:/cycle/current/data/sics'
+__data_folder__ = 'Z:/cycle/current/data/sics'
 #__data_folder__ = 'Y:/testing/bilby/sicsdata'
-__export_folder__ = 'W:/cycle/current/data/sics/reports'
+__export_folder__ = 'Z:/cycle/current/data/sics/reports'
 __buffer_log_file__ = __export_folder__
 Dataset.__dicpath__ = get_absolute_path('/Internal/path_table')
 System.setProperty('sics.data.path', __data_folder__)
@@ -110,7 +110,7 @@ def add_dataset():
         
         def remote_path(local):
             result = local.replace('\\', '/')
-            if result[0:2] == 'W:':
+            if result[0:2] == 'Z:':
                 result = "/mnt/zfstor1/bilby" + result[2:]
             elif result[0:2] == 'V:':
                 result = "/mnt/zfstor1/bilby" + result[2:]
@@ -420,7 +420,7 @@ __script__.numColumns = 4
 
 workflow_list = []
 __workflow_seq__ = 0
-__report_folder__ = 'W:/data/current/reports/pWorkflow'
+__report_folder__ = 'Z:/cycle/current/data/sics/reports/pWorkflow'
 _is_running = False
 _start_timestamp = 0
 _counting_status = 'counting'
