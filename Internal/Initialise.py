@@ -17,30 +17,22 @@ from java.io import File
 from time import strftime, localtime
 import traceback
 import socket
+from Internal.logger import *
 
 sics.ready = False
 __script__.title = 'Initialised'
 __script__.version = ''
-__data_folder__ = 'Z:/cycle/current/data/sics'
-#__data_folder__ = 'Z:/testing/pelican'
-__export_folder__ = 'Z:/cycle/current/data/sics/reports'
-__buffer_log_file__ = __export_folder__
+
+__data_folder__ = System.getProperty('sics.data.path')
+__export_folder__ = __data_folder__ + '/reports'
+
 Dataset.__dicpath__ = get_absolute_path('/Internal/path_table')
-System.setProperty('sics.data.path', __data_folder__)
 
 try:
     __dispose_all__(None)
 except:
     pass
 
-fi = File(__buffer_log_file__)
-if not fi.exists():
-    if not fi.mkdirs():
-        print 'Error: failed to make directory: ' + __buffer_log_file__
-__history_log_file__ = __buffer_log_file__ + '/History.txt'
-__buffer_log_file__ += '/LogFile.txt'
-__buffer_logger__ = open(__buffer_log_file__, 'a')
-__history_logger__ = open(__history_log_file__, 'a')
 
 print 'Waiting for SICS connection'
 while sics.getSicsController() == None:
@@ -110,22 +102,6 @@ class __SaveCountListener__(DynamicControllerListenerAdapter):
                     
 __saveCountListener__ = __SaveCountListener__()
 __save_count_node__.addComponentListener(__saveCountListener__)
-
-def update_buffer_log_folder():
-    global __buffer_log_file__, __export_folder__, __buffer_logger__, __history_log_file__, __history_logger__
-    __buffer_log_file__ = __export_folder__
-    fi = File(__buffer_log_file__)
-    if not fi.exists():
-        if not fi.mkdirs():
-            print 'Error: failed to make directory: ' + __buffer_log_file__
-    __history_log_file__ = __buffer_log_file__ + '/History.txt'
-    __buffer_log_file__ += '/LogFile.txt'
-    if __buffer_logger__:
-        __buffer_logger__.close()
-    __buffer_logger__ = open(__buffer_log_file__, 'a')
-    if __history_logger__:
-         __history_logger__.close()
-    __history_logger__ = open(__history_log_file__, 'a')
 
 
 def __run_script__(dss):
@@ -236,21 +212,6 @@ def previous_step():
 def next_step():
     load_script(next_file)
 
-def logBook(text):
-    global __buffer_logger__
-    global __history_logger__
-    try:
-        tsmp = strftime("[%Y-%m-%d %H:%M:%S]", localtime())
-        __buffer_logger__.write(tsmp + ' ' + text + '\n')
-        __buffer_logger__.flush()
-        for item in HISTORY_KEY_WORDS:
-            if text.startswith(item):
-                __history_logger__.write(tsmp + ' ' + text + '\n')
-                __history_logger__.flush()
-    except:
-        traceback.print_exc(file=sys.stdout)
-        print 'failed to log'
-    
 def slog(text, f_err = False):
     if f_err:
         logErr(text + '\n')
@@ -271,10 +232,10 @@ def __dispose_all__(event):
     global __save_count_node__
     global __saveCountListener__
     __save_count_node__.removeComponentListener(__saveCountListener__)
-    if __buffer_logger__:
-        __buffer_logger__.close()
-    if __history_logger__:
-         __history_logger__.close()
+#    if __buffer_logger__:
+#        __buffer_logger__.close()
+#    if __history_logger__:
+#         __history_logger__.close()
     
 
 __dispose_listener__ = __Dispose_Listener__()

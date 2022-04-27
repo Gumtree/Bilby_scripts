@@ -27,6 +27,7 @@ from xml.etree.ElementTree import Element, SubElement, ElementTree, tostring
 from gumpy.commons.logger import n_logger
 from gumpy.lib import enum
 import random
+from Internal.logger import *
 
 # Script control setup area
 # script info
@@ -35,26 +36,15 @@ __script__.version = '2.1'
 
 sics.ready = False
 
-__data_folder__ = 'Z:/cycle/current/data/sics'
-#__data_folder__ = 'Y:/testing/bilby/sicsdata'
-__export_folder__ = 'Z:/cycle/current/data/sics/reports'
-__buffer_log_file__ = __export_folder__
+__data_folder__ = System.getProperty('sics.data.path')
+__export_folder__ = __data_folder__ + '/reports'
+
 Dataset.__dicpath__ = get_absolute_path('/Internal/path_table')
-System.setProperty('sics.data.path', __data_folder__)
 
 try:
     __dispose_all__(None)
 except:
     pass
-
-fi = File(__buffer_log_file__)
-if not fi.exists():
-    if not fi.mkdirs():
-        slog('Error: failed to make directory: ' + __buffer_log_file__, True)
-__history_log_file__ = __buffer_log_file__ + '/History.txt'
-__buffer_log_file__ += '/LogFile.txt'
-__buffer_logger__ = open(__buffer_log_file__, 'a')
-__history_logger__ = open(__history_log_file__, 'a')
 
 print 'Waiting for SICS connection'
 while sics.getSicsController() == None:
@@ -231,22 +221,6 @@ class __FileStatusListener__(DynamicControllerListenerAdapter):
 __fileStatusListener__ = __FileStatusListener__()
 __file_status_node__.addComponentListener(__fileStatusListener__)
 
-def update_buffer_log_folder():
-    global __buffer_log_file__, __export_folder__, __buffer_logger__, __history_log_file__, __history_logger__
-    __buffer_log_file__ = __export_folder__
-    fi = File(__buffer_log_file__)
-    if not fi.exists():
-        if not fi.mkdirs():
-            slog('Error: failed to make directory: ' + __buffer_log_file__, True)
-    __history_log_file__ = __buffer_log_file__ + '/History.txt'
-    __buffer_log_file__ += '/LogFile.txt'
-    if __buffer_logger__:
-        __buffer_logger__.close()
-    __buffer_logger__ = open(__buffer_log_file__, 'a')
-    if __history_logger__:
-         __history_logger__.close()
-    __history_logger__ = open(__history_log_file__, 'a')
-
 class __State_Monitor__(IStateMonitorListener):
     def __init__(self):
         pass
@@ -282,20 +256,21 @@ def __load_experiment_data__():
     Plot1.y_label = str(data_name.value)
     Plot1.title = str(data_name.value) + ' vs ' + axis_name.value
     Plot1.pv.getPlot().setMarkerEnabled(True)
-def logBook(text):
-    global __buffer_logger__
-    global __history_logger__
-    try:
-        tsmp = strftime("[%Y-%m-%d %H:%M:%S]", localtime())
-        __buffer_logger__.write(tsmp + ' ' + text + '\n')
-        __buffer_logger__.flush()
-        for item in HISTORY_KEY_WORDS:
-            if text.startswith(item):
-                __history_logger__.write(tsmp + ' ' + text + '\n')
-                __history_logger__.flush()
-    except:
-        traceback.print_exc(file=sys.stdout)
-        print 'failed to log'
+    
+#def logBook(text):
+#    global __buffer_logger__
+#    global __history_logger__
+#    try:
+#        tsmp = strftime("[%Y-%m-%d %H:%M:%S]", localtime())
+#        __buffer_logger__.write(tsmp + ' ' + text + '\n')
+#        __buffer_logger__.flush()
+#        for item in HISTORY_KEY_WORDS:
+#            if text.startswith(item):
+#                __history_logger__.write(tsmp + ' ' + text + '\n')
+#                __history_logger__.flush()
+#    except:
+#        traceback.print_exc(file=sys.stdout)
+#        print 'failed to log'
     
 def slog(text, f_err = False):
     if f_err:
@@ -369,10 +344,10 @@ def __dispose_all__(event):
     __sics_console_event_handler_received__.deactivate()
     __save_count_node__.removeComponentListener(__saveCountListener__)
     __file_status_node__.removeComponentListener(__fileStatusListener__)
-    if __buffer_logger__:
-        __buffer_logger__.close()
-    if __history_logger__:
-         __history_logger__.close()
+#    if __buffer_logger__:
+#        __buffer_logger__.close()
+#    if __history_logger__:
+#         __history_logger__.close()
     
 
 __dispose_listener__ = __Dispose_Listener__()
