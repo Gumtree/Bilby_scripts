@@ -129,11 +129,11 @@ def add_dataset():
         port = 8123
         
         # create TCP/IP socket
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sflag = False
         ct = 0
         while ct < 3 and not sflag:
             ct += 1
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             sock.connect((host, port))
             
             try:
