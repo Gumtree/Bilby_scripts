@@ -130,21 +130,21 @@ def add_dataset():
         
         # create TCP/IP socket
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.connect((host, port))
-        
-        try:
-            # receive welcome message from daemon
-            welcome = sock.recv(1024)
-            if not welcome:
-                raise RuntimeError("connection broken")
-        
-            slog( str(welcome) )
-            slog( str(msg) )
-        
-            sflag = False
-            ct = 0
-            while ct < 3 and not sflag:
-                ct += 1
+        sflag = False
+        ct = 0
+        while ct < 3 and not sflag:
+            ct += 1
+            sock.connect((host, port))
+            
+            try:
+                # receive welcome message from daemon
+                welcome = sock.recv(1024)
+                if not welcome:
+                    raise RuntimeError("connection broken")
+            
+                slog( str(welcome) )
+                slog( str(msg) )
+            
                 sock.send(msg)
                 response = ""
                 while True:
@@ -163,9 +163,9 @@ def add_dataset():
                 else:
                     slog('tar process was successful')
                     sflag = True
-        
-        finally:
-            sock.close()
+            
+            finally:
+                sock.close()
     except:
         msg = traceback.format_exc()
         slog(msg, True)
