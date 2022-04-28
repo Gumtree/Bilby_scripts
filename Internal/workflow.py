@@ -141,15 +141,28 @@ def add_dataset():
             slog( str(welcome) )
             slog( str(msg) )
         
-            sock.send(msg)
-            response = ""
-            while True:
-                recv = sock.recv(1024)
-                if not recv:
-                    break
-                response += recv
-        
-            slog( str(response) )
+            sflag = False
+            ct = 0
+            while ct < 3 and not sflag:
+                ct += 1
+                sock.send(msg)
+                response = ""
+                while True:
+                    recv = sock.recv(1024)
+                    if not recv:
+                        break
+                    response += recv
+            
+                slog( str(response) )
+                if 'ERROR' in str(response):
+                    if ct < 3:
+                        slog("errors in the tar process, try again")
+                        time.sleep(0.5)
+                    else:
+                        slog("errors persist after 3 tries, give up")
+                else:
+                    slog('tar process was successful')
+                    sflag = True
         
         finally:
             sock.close()
