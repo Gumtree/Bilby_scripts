@@ -292,6 +292,9 @@ def slog(text, f_err = False):
         logln(text + '\n')
     logBook(text)
 
+def errlog(text):
+    slog(text, True)
+    
 class BatchStatusListener(SicsProxyListenerAdapter):
     
     def __init__(self):
@@ -2125,7 +2128,10 @@ def select_stage():
     slog('clear workflow')
     for i in xrange(len(workflow_list)):
         rmv = workflow_list.pop()
-        rmv.dispose()
+        if rmv is None:
+            errlog('failed to pop item from workflow list')
+        else:
+            rmv.dispose()
         
     add_block()
     slog(str(__number_of_sample__) + ' sample stage selected')
