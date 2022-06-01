@@ -15,9 +15,9 @@ import traceback
 
 __script__.title = 'Initialised'
 __script__.version = ''
-__data_folder__ = 'W:/data/current'
+__data_folder__ = 'W:/cycle/current/data/sics'
 #__data_folder__ = 'Z:/testing/pelican'
-__export_folder__ = 'D:/Gumtree/gumtree_logs'
+__export_folder__ = 'C:/Gumtree/gumtree_logs'
 __buffer_log_file__ = __export_folder__
 Dataset.__dicpath__ = get_absolute_path('/Internal/path_table')
 
