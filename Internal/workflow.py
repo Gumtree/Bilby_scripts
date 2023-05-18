@@ -747,7 +747,7 @@ class WorkflowBlock():
 
     def get_html(self):
         if self.enabled.value:
-            html = self.table.get_html(self.config.value)
+            html = self.table.get_html(self.title.value + "\n" + self.config.value)
             try:
                 span = Element('span')
                 span.set('class', 'class_span_tablefoot')
