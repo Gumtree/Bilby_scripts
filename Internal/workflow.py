@@ -1492,6 +1492,34 @@ class SampleTable():
         
         tr = SubElement(table, 'tr')
         th = SubElement(tr, 'th')
+        th.set('colspan', '3')
+        th.text = "transmission setup"
+        th = SubElement(tr, 'th')
+        th.set('colspan', '5')
+        th.text = "scattering setup"
+
+        tr = SubElement(table, 'tr')
+        th = SubElement(tr, 'td')
+        th.set('colspan', '3')
+        pre = SubElement(th, 'pre')
+        pre.set("style", "margin-top: 0px;margin-bottom: 0px;text-align:left")
+        trans = self.trans_setup.value
+        if trans != None and len(trans.strip()) > 0:
+            pre.text = trans
+        else:
+            pre.text = "#empty"
+        th = SubElement(tr, 'td')
+        th.set('colspan', '5')
+        pre = SubElement(th, 'pre')
+        pre.set("style", "margin-top: 0px;margin-bottom: 0px;text-align:left")
+        scatt = self.scatt_setup.value
+        if scatt != None and len(scatt.strip()) > 0:
+            pre.text = scatt
+        else:
+            pre.text = "#empty"
+        
+        tr = SubElement(table, 'tr')
+        th = SubElement(tr, 'th')
         th.set("style", "width: 8%;")
         th.text = 'Position'
         th = SubElement(tr, 'th')
