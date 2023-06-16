@@ -378,7 +378,7 @@ sics.ready = True
 # The type can be string, int, float, bool, file.
 
 # Use below example to create a button
-__number_of_sample__ = 10
+__number_of_sample__ = 12
 #try:
 #    uplim = sics.get_raw_value('samx softupperlim')
 #    lowlim = sics.get_raw_value('samx softlowerlim')
@@ -396,7 +396,7 @@ __number_of_sample__ = 10
 try:
     z = get_raw_value('samz')
     if z > 150 and z < 180 :
-        __number_of_sample__ = 10
+        __number_of_sample__ = 12
     else:
         __number_of_sample__ = 5
     slog('sample stage used: ' + str(__number_of_sample__) + ' samples')
@@ -1947,7 +1947,7 @@ def save_config(wid):
         slog('cancel saving configuration')
     
 def load_workflow():
-    global workflow_list
+    global workflow_list, __number_of_sample__
     fn = selectLoadFile(['*.pkl'], None)
     if fn is None:
         return
@@ -1959,6 +1959,19 @@ def load_workflow():
         file.close()
     try:
         if not wl is None and len(wl) > 0:
+            if type(wl[0]) is int:
+                stage = wl[0]
+                wl = wl[1:]
+                if stage != par_stage.value:
+                    par_stage.value = stage
+                    __number_of_sample__ = stage
+                    bilby.__sampleNum__ = stage
+                    for i in xrange(len(workflow_list)):
+                        rmv = workflow_list.pop()
+                        if rmv is None:
+                            errlog('failed to pop item from workflow list')
+                        else:
+                            rmv.dispose()
             if len(wl) > len(workflow_list) :
                 for i in xrange(len(wl) - len(workflow_list)):
                     workflow_list.append(WorkflowBlock())
@@ -1992,6 +2005,7 @@ def export_workflow(path = None):
     slog('workflow exported to ' + path)
     file = open(path, 'wb')
     wf_rep = []
+    wf_rep.append(par_stage.value)
     for wb in workflow_list:
         wf_rep.append(wb.to_rep())
     try:
