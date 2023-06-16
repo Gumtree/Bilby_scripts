@@ -379,6 +379,7 @@ sics.ready = True
 
 # Use below example to create a button
 __number_of_sample__ = 12
+bilby.__sampleNum__ = 12
 #try:
 #    uplim = sics.get_raw_value('samx softupperlim')
 #    lowlim = sics.get_raw_value('samx softlowerlim')
@@ -393,16 +394,17 @@ __number_of_sample__ = 12
 #except:
 #    pass
 ''' modified on 29/03/2017, using samz to decide which stage is used '''
-try:
-    z = get_raw_value('samz')
-    if z > 150 and z < 180 :
-        __number_of_sample__ = 12
-    else:
-        __number_of_sample__ = 5
-    slog('sample stage used: ' + str(__number_of_sample__) + ' samples')
-    bilby.__sampleNum__ = __number_of_sample__
-except:
-    pass
+''' disabled on 16/06/2023, set default to 12 and let user to choose sample stage.'''
+#try:
+#    z = get_raw_value('samz')
+#    if z > 150 and z < 180 :
+#        __number_of_sample__ = 12
+#    else:
+#        __number_of_sample__ = 5
+#    slog('sample stage used: ' + str(__number_of_sample__) + ' samples')
+#    bilby.__sampleNum__ = __number_of_sample__
+#except:
+#    pass
 
 __default_transmission_time__ = 60
 __default_scattering_time__ = 120
