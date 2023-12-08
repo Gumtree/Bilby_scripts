@@ -2192,7 +2192,7 @@ pro_bar.max = 0
 pro_bar.selection = 0
 pro_bar.colspan = 4
 
-par_stage = Par('int', __number_of_sample__, options = [10, 5, 12, 6, 1])
+par_stage = Par('int', __number_of_sample__, options = [10, 5, 12, 6, 1, 16])
 par_stage.title = 'select sample stage'
 
 act_apply = Act('select_stage()', 'Apply the change')
