@@ -649,7 +649,7 @@ class WorkflowBlock():
             self.table.t5.value = rep['scatt_enabled']
         else:
             self.table.t5.value = True
-        if rep.has_key('env_command'): 
+        if rep.has_key('env_target'): 
             self.table.env_target.value = rep['env_target']
         else:
             self.table.t5.value = True
@@ -696,6 +696,8 @@ class WorkflowBlock():
                     sp.scatt_time.value = rep['scatt_time']
                 else:
                     sp.scatt_time.value = 60
+        if self.table.meerMode:
+            self.table.set_meer_temp()
     
     def need_to_run(self):
 #        for i in self.table.samples:
@@ -2178,7 +2180,7 @@ def load_workflow():
         file.close()
     try:
         if not wl is None and len(wl) > 0:
-            if type(wl[0]) is int or type(wl[0]) is str:
+            if type(wl[0]) is int or type(wl[0]) is str or type(wl[0]) is unicode:
                 stage = str(wl[0])
                 wl = wl[1:]
                 if stage != par_stage.value:
