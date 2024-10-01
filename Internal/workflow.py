@@ -34,6 +34,10 @@ from Internal.logger import *
 __script__.title = 'Bilby Workflow'
 __script__.version = '2.1'
 
+MEER_TIMEOUT = 300
+MEER_RETRY_CYCLE = 5
+MEER_PRECISION = 0.1
+            
 sics.ready = False
 
 __data_folder__ = System.getProperty('sics.data.path')
@@ -378,8 +382,8 @@ sics.ready = True
 # The type can be string, int, float, bool, file.
 
 # Use below example to create a button
-__number_of_sample__ = 12
-bilby.__sampleNum__ = 12
+__sample_stage_name__ = '12'
+bilby.__sampleStage__ = __sample_stage_name__
 #try:
 #    uplim = sics.get_raw_value('samx softupperlim')
 #    lowlim = sics.get_raw_value('samx softlowerlim')
@@ -475,7 +479,7 @@ class WorkflowBlock():
         ctext.title = 'configuration'
         gc.add(cenabled, ctitle, ctext, cload, csave, ctest, cremove)
         #gs = Group('samples')
-        gt = SampleTable(self.wid)
+        gt = SampleTable(self.wid, isMeerMode = __sample_stage_name__ in bilby.__meer_devices__)
         gt.group.colspan = 4
         gc.add(gt.group)
         cnew = Act('insert_block(' + str(self.wid) + ')', 'Add New Block Below')
@@ -595,6 +599,8 @@ class WorkflowBlock():
         rep['thickness'] = self.table.thickness.value
         rep['trans_enabled'] = self.table.t3.value
         rep['scatt_enabled'] = self.table.t5.value
+        rep['env_target'] = self.table.env_target.value
+        rep['env_parameter'] = self.table.env_par.value
         for id in self.table.samples:
             sp = self.table.samples[id]
             rep['name_' + str(id)] = sp.name_text.value
@@ -641,6 +647,14 @@ class WorkflowBlock():
             self.table.t3.value = True
         if rep.has_key('scatt_enabled'): 
             self.table.t5.value = rep['scatt_enabled']
+        else:
+            self.table.t5.value = True
+        if rep.has_key('env_command'): 
+            self.table.env_target.value = rep['env_target']
+        else:
+            self.table.t5.value = True
+        if rep.has_key('env_parameter'): 
+            self.table.env_par.value = rep['env_parameter']
         else:
             self.table.t5.value = True
         for id in self.table.samples:
@@ -786,6 +800,7 @@ class Sample():
         s1_scatt_res = Par('label', ' ' * 17)
         s1_scatt_res.width = 120
         self.id_label = s1_idx
+        self.meer_temp = None
         self.name_text = s1_name
         self.thickness = s1_thickness
         self.do_trans = s1_trans
@@ -800,7 +815,40 @@ class Sample():
         self.scatt_stop_time = 0
         self.actual_trans_time = 0
         self.actual_scatt_time = 0
-        
+    
+    def set_meer_temp(self, val):
+        self.meer_temp = val
+        if not val is None:
+            self.id_label.value = str(self.idx) + ' (' + str(val) + ')'
+        else:
+            self.id_label.value = str(self.idx)
+    
+    def wait_for_meer(self):
+        if self.meer_temp is None:
+            return
+        cv = sics.get_ms(self.idx)
+        if abs(cv - float(self.meer_temp)) < MEER_PRECISION :
+            return
+        slog('wait for MEER{0:02d}'.format(self.idx))
+        ct = 0
+        ov = cv
+        while ct < MEER_TIMEOUT:
+            time.sleep(0.5)
+            ct += 0.5
+            cv = sics.get_ms(self.idx)
+            if abs(cv - float(self.meer_temp)) < MEER_PRECISION :
+                return
+            if ct % 5 == 0 and abs(ov - cv) < MEER_PRECISION :
+                self.rerun_ms()
+        slog('driving MEER{0:02d} to {} failed with timeout'.format(did, self.meer_temp), True)
+        slog('continue the workflow even though MEER temperature not reached', True)
+
+    def rerun_ms(self):
+        if self.meer_temp is None:
+            return
+        nt = self.meer_temp + random.uniform(0,0.001)
+        sics.run_ms(self.idx, nt)
+                
     def dispose(self):
         self.id_label.dispose()
         self.name_text.dispose()
@@ -817,6 +865,8 @@ class Sample():
         global _driving_status
         global __is_collection_interrupted__
         if self.do_trans.value and len(self.trans_res.value.strip()) == 0:
+            if not self.meer_temp is None:
+                self.wait_for_meer()
             slog('start transmission collection for sample number ' + str(self.idx))
             if len(str(self.name_text.value)) > 0:
                 slog('transmission: ' + str(self.name_text.value))
@@ -1120,41 +1170,79 @@ def get_short_pdfname(fn):
     return fn
     
 class SampleTable():
-    def __init__(self, wid, name = 'Samples'):
+    def __init__(self, wid, name = 'Samples', isMeerMode = False):
         self.wid = wid
+        self.meerMode = isMeerMode
         self.samples = dict()
         self.group = Group(name)
         self.group.hideTitle = True
         self.group.numColumns = 9
         self.group.colspan = 4
+        
+        config_group = Group('')
+        config_group.hideTitle = True
+        config_group.hideBorder = True
+        config_group.numColumns = 2
+        config_group.colspan = 9
+        
         trans_setup = Par('string', '')
         trans_setup.title = 'transmission setup'
-        trans_setup.colspan = 5
+#        trans_setup.colspan = 5
         trans_setup.height = 40
+#        space1 = Par('space')
         scatt_setup = Par('string', '')
         scatt_setup.title = 'scattering setup'
-        scatt_setup.colspan = 3
+#        scatt_setup.colspan = 3
         scatt_setup.height = 40
-        space1 = Par('space')
         
         trans_time = Par('float', '60', command='change_trans_time(' \
                          + str(wid) + ')')
         trans_time.title = 'transmission time'
-        trans_time.colspan = 5
+#        trans_time.colspan = 5
+#        space2 = Par('space')
         scatt_time = Par('float', '120', command='change_scatt_time(' \
                          + str(wid) + ')')
         scatt_time.title = 'scattering time'
-        scatt_time.colspan = 3
-        space2 = Par('space')
+#        scatt_time.colspan = 3
         
+        env_group = Group('')
+        env_group.hideTitle = True
+        env_group.hideBorder = True
+#        env_group.colspan = 5
+        env_group.numColumns = 2
+#        env_label = Par('label', 'Env')
+#        env_label.width = 32
+        if isMeerMode:
+#            temp_config = Par('string', '', command='set_temp_config({})'.format(wid))
+#            temp_config.title = 'temperatures'
+            env_target = Par('string', 'all', command='set_meer_temp({})'.format(wid))
+            env_target.title = 'Env: run_ms'
+            env_target.colspan = 1
+            env_par = Par('string', '', command='set_meer_temp({})'.format(wid))
+            env_par.title = 'to'
+            env_par.colspan = 1
+        else:
+            env_target = Par('string', '', command='set_env({})'.format(wid))
+            env_target.title = 'Env: drive'
+            env_target.colspan = 1
+            env_par = Par('string', '', command='set_env({})'.format(wid))
+            env_par.title = 'to'
+            env_par.colspan = 1
+        env_group.add(env_target, env_par)
+        
+#        space3 = Par('space')
         thickness = Par('float', 0, command='change_thickness({})'.format(wid))
         thickness.title = 'sample thickness (cm)'
-        thickness.colspan = 5
-        space3 = Par('space')
-        space3.colspan = 4
-         
+#        thickness.colspan = 3
+        config_group.add(trans_setup, scatt_setup, 
+                         trans_time, scatt_time,
+                         env_group, thickness)
+        
         tit_1 = Par('label', 'idx')
-        tit_1.width = 24
+        if isMeerMode:
+            tit_1.width = 72
+        else :
+            tit_1.width = 24
         tit_2 = Par('label', 'Sample Name')
         tit_thick = Par('label', 'Thickness (cm)')
         
@@ -1173,9 +1261,16 @@ class SampleTable():
         self.thickness = thickness
         self.trans_setup = trans_setup
         self.scatt_setup = scatt_setup
-        self.space1 = space1
-        self.space2 = space2
-        self.space3 = space3
+#        self.space1 = space1
+#        self.space2 = space2
+#        self.space3 = space3
+#        self.temp_config = temp_config
+#        self.env_label = env_label
+        self.env_target = env_target
+        self.env_par = env_par
+#        self.env_label = env_label
+        self.env_group = env_group
+        self.config_group = config_group
         self.t1 = tit_1
         self.t2 = tit_2
         self.thick_title = tit_thick
@@ -1183,11 +1278,11 @@ class SampleTable():
         self.t4 = tit_4
         self.t5 = tit_5
         self.t6 = tit_6
-        self.group.add(trans_setup, scatt_setup, space1, trans_time, \
-                       scatt_time, space2, thickness, space3, \
+        self.group.add(config_group, \
                        tit_1, tit_2, tit_thick, tit_3, \
                        tit_4, tit_5, tit_6)
-        for i in xrange(__number_of_sample__) :
+        self.stage_size = bilby.get_stage_size()
+        for i in xrange(self.stage_size) :
             self.add_sample(i + 1)
         self.trans_config_start_time = 0
         self.trans_config_stop_time = 0
@@ -1206,6 +1301,70 @@ class SampleTable():
         self.group.add(sample.id_label, sample.name_text, sample.thickness, sample.do_trans, sample.trans_time, \
                  sample.trans_res, sample.do_scatt, sample.scatt_time, sample.scatt_res)
     
+    def set_meer_temp(self):
+        target = self.env_target.value.strip()
+        if len(target) == 0:
+            logln('environment target not set')
+            return
+        par = self.env_par.value.strip()
+        if len(par) == 0:
+#            logln('target values not set')
+            for i in self.samples:
+                self.samples[i].set_meer_temp(None)
+            return
+        if ',' in par:
+            if not par.startswith('['):
+                par = '[' + par + ']'
+        try:
+            val = eval(par)
+        except:
+            logErr('invalid target values: ' + par)
+            return
+            
+        if target == 'all':
+            slog('set meer all')
+            if type(val) is list or type(val) is tuple:
+                for i in self.samples:
+                    self.samples[i].set_meer_temp(val[i - 1])
+            else:
+                for i in self.samples:
+                    self.samples[i].set_meer_temp(val)
+        else:
+            if ',' in target:
+                if not target.startswith('['):
+                    target = '[' + target + ']'
+            try:
+                entries = eval(target)    
+            except:
+                slog('invalid target enties: ' + target, True)
+                return
+            slog('set meer entries ' + target)
+            if type(entries) is list or type(entries) is tuple:
+                if type(val) is list or type(val) is tuple:
+                    if len(entries) != len(val):
+                        slog('number of entries and values does not match', True)
+                        return
+                    for i in xrange(len(entries)):
+                        self.samples[entries[i]].set_meer_temp(val[i])
+                    for i in self.samples:
+                        if not (i in entries):
+                            self.samples[i].set_meer_temp(None)
+                else:
+                    for i in xrange(len(entries)):
+                        self.samples[entries[i]].set_meer_temp(val)
+                    for i in self.samples:
+                        if not (i in entries):
+                            self.samples[i].set_meer_temp(None)
+            else:
+                if type(val) is list or type(val) is tuple:
+                    slog('can not set list value to 1 entry', True)
+                    return
+                for i in self.samples :
+                    if i == entries:
+                        self.samples[i].set_meer_temp(val)
+                    else:
+                        self.samples[i].set_meer_temp(None)
+                    
     def test_run(self):
         slog('test running transmission setup')
         test_exec(self.trans_setup.value)
@@ -1221,6 +1380,7 @@ class SampleTable():
         self.scatt_setup.enabled = False
         try:
             while self.need_to_run():
+                self.run_env()
                 if self.need_to_run_trans():
                     self.run_trans_setup()
                     self.run_trans()
@@ -1250,6 +1410,33 @@ class SampleTable():
                 return True
         return False
 
+    def run_env(self):
+        target = self.env_target.value.strip()
+        if len(target) == 0:
+            return
+        par = self.env_par.value.strip()
+        if len(par) == 0:
+            return
+        if self.meerMode:
+            if target == 'all':
+                if ',' in par:
+                    if not par.startswith('['):
+                        par = '[' + par + ']'
+                val = eval(par)
+                sics.run_all_ms(val)
+            else:
+                if ',' in target :
+                    if not target.startswith('['):
+                        target = '[' + target + ']'
+                entries = eval(t)
+                if ',' in par:
+                    if not par.startswith('['):
+                        par = '[' + par + ']'
+                val = eval(par)
+                sics.run_ms(entries, val)
+        else:
+            sics.drive(target, float(par))
+        
     def get_job_count(self):
         ct = 0
         for i in self.samples:
@@ -1464,9 +1651,15 @@ class SampleTable():
         self.group.dispose()
         self.trans_setup.dispose()
         self.scatt_setup.dispose()
-        self.space1.dispose()
-        self.space2.dispose()
-        self.space3.dispose()
+#        self.space1.dispose()
+#        self.space2.dispose()
+#        self.space3.dispose()
+#        self.temp_config.dispose()
+#        self.env_label.dispose()
+        self.env_target.dispose()
+        self.env_par.dispose()
+        self.env_group.dispose()
+        self.config_group.dispose()
         
     def append_xml(self, parent):
         for i in sorted(self.samples):
@@ -1486,7 +1679,7 @@ class SampleTable():
         th = SubElement(tr, 'th')
         th.set('colspan', '3')
         th.text = strftime("%Y-%m-%dT%H:%M:%S", localtime())
-        th = SubElement(tr, 'th')
+        th = SubElement(tr, 'td')
         th.set('colspan', '5')
         pre = SubElement(th, 'pre')
         pre.set("style", "margin-top: 0px;margin-bottom: 0px;text-align:left")
@@ -1520,6 +1713,16 @@ class SampleTable():
         else:
             pre.text = "#empty"
         
+        par = self.cmd_par.value.strip()
+        if len(par) > 0:
+            tr = SubElement(table, 'tr')
+            th = SubElement(tr, 'th')
+            th.set('colspan', '3')
+            th.text = "environment setup"
+            th = SubElement(tr, 'td')
+            th.set('colspan', '5')
+            th.text = self.cmd.title + ' ' + self.cmd.value.strip() + ' to ' + par
+
         tr = SubElement(table, 'tr')
         th = SubElement(tr, 'th')
         th.set("style", "width: 8%;")
@@ -1553,6 +1756,14 @@ class SampleTable():
                 table.append(elmt)
             
         return tostring(table, method = 'html')
+    
+def set_env(wid):
+    pass
+
+def set_meer_temp(wid):
+    b = get_workflow_block(wid)
+    if not b is None:
+        b.table.set_meer_temp()
     
 def save_temp_data():
     cfn = get_base_filename()
@@ -1733,6 +1944,8 @@ def insert_block(wid):
             wb.table.thickness.value = old.table.thickness.value
             wb.table.trans_setup.value = old.table.trans_setup.value
             wb.table.scatt_setup.value = old.table.scatt_setup.value
+            wb.table.env_target.value = old.table.env_target.value
+            wb.table.env_par.value = old.table.env_par.value
             for i in wb.table.samples:
                 sample = wb.table.samples[i]
                 old_sample = old.table.samples[i]
@@ -1742,6 +1955,7 @@ def insert_block(wid):
                 sample.trans_time.value = old_sample.trans_time.value
                 sample.do_scatt.value = old_sample.do_scatt.value
                 sample.scatt_time.value = old_sample.scatt_time.value
+            wb.table.set_meer_temp()
         finally:
             __UI__.updateUI()
     update_progress()
@@ -1768,6 +1982,8 @@ def add_block():
             wb.table.thickness.value = old.table.thickness.value
             wb.table.trans_setup.value = old.table.trans_setup.value
             wb.table.scatt_setup.value = old.table.scatt_setup.value
+            wb.table.env_target.value = old.table.env_target.value
+            wb.table.env_par.value = old.table.env_par.value
             for i in wb.table.samples:
                 sample = wb.table.samples[i]
                 old_sample = old.table.samples[i]
@@ -1777,6 +1993,7 @@ def add_block():
                 sample.trans_time.value = old_sample.trans_time.value
                 sample.do_scatt.value = old_sample.do_scatt.value
                 sample.scatt_time.value = old_sample.scatt_time.value
+            wb.table.set_meer_temp()
     finally:
         __UI__.updateUI()
 
@@ -1949,7 +2166,7 @@ def save_config(wid):
         slog('cancel saving configuration')
     
 def load_workflow():
-    global workflow_list, __number_of_sample__
+    global workflow_list, __sample_stage_name__
     fn = selectLoadFile(['*.pkl'], None)
     if fn is None:
         return
@@ -1961,13 +2178,13 @@ def load_workflow():
         file.close()
     try:
         if not wl is None and len(wl) > 0:
-            if type(wl[0]) is int:
-                stage = wl[0]
+            if type(wl[0]) is int or type(wl[0]) is str:
+                stage = str(wl[0])
                 wl = wl[1:]
                 if stage != par_stage.value:
                     par_stage.value = stage
-                    __number_of_sample__ = stage
-                    bilby.__sampleNum__ = stage
+                    bilby.__sampleStage__ = stage
+                    __sample_stage_name__ = stage
                     for i in xrange(len(workflow_list)):
                         rmv = workflow_list.pop()
                         if rmv is None:
@@ -2163,12 +2380,12 @@ def test_exec(text):
         slog(str(traceback.format_exc().splitlines()[-1]), f_err = True)
      
 def select_stage():
-    global __number_of_sample__
+    global __sample_stage_name__
     global workflow_list
     if not confirm('This will remove all existing workflow blocks. Do you want to continue?') :
         return
-    __number_of_sample__ = par_stage.value
-    bilby.__sampleNum__ = __number_of_sample__
+    bilby.__sampleStage__ = par_stage.value
+    __sample_stage_name__ = bilby.__sampleStage__
     slog('clear workflow')
     for i in xrange(len(workflow_list)):
         rmv = workflow_list.pop()
@@ -2178,7 +2395,7 @@ def select_stage():
             rmv.dispose()
         
     add_block()
-    slog(str(__number_of_sample__) + ' sample stage selected')
+    slog(str(__sample_stage_name__) + ' sample stage selected')
     
 #def upload_html(wid):
 #    bl = get_workflow_block(wid)
@@ -2192,7 +2409,8 @@ pro_bar.max = 0
 pro_bar.selection = 0
 pro_bar.colspan = 4
 
-par_stage = Par('int', __number_of_sample__, options = [10, 5, 12, 6, 1, 16])
+#par_stage = Par('str', __sample_stage_name__, options = ['10', '5', '12', '6', 'fixed', '16', 'meer16'])
+par_stage = Par('str', __sample_stage_name__, options = bilby.__sampleMap__.keys())
 par_stage.title = 'select sample stage'
 
 act_apply = Act('select_stage()', 'Apply the change')
