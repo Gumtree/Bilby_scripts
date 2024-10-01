@@ -831,13 +831,14 @@ class Sample():
         cv = sics.get_ms(self.idx)
         if abs(cv - float(self.meer_temp)) < MEER_PRECISION :
             return
-        slog('wait for MEER{0:02d}'.format(self.idx))
+        slog('wait for MEER{0:02d} to be {}'.format(self.idx, self.meer_temp))
         ct = 0
         ov = cv
         while ct < MEER_TIMEOUT:
             time.sleep(0.5)
             ct += 0.5
             cv = sics.get_ms(self.idx)
+            sics.handleInterrupt()
             if abs(cv - float(self.meer_temp)) < MEER_PRECISION :
                 return
             if ct % 5 == 0 and abs(ov - cv) < MEER_PRECISION :
@@ -1430,7 +1431,7 @@ class SampleTable():
                 if ',' in target :
                     if not target.startswith('['):
                         target = '[' + target + ']'
-                entries = eval(t)
+                entries = eval(target)
                 if ',' in par:
                     if not par.startswith('['):
                         par = '[' + par + ']'
