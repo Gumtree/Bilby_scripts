@@ -830,8 +830,9 @@ class Sample():
             return
         cv = sics.get_ms(self.idx)
         if abs(cv - float(self.meer_temp)) < MEER_PRECISION :
+            slog('MEER{:02d} is at {}'.format(self.idx, self.meer_temp))
             return
-        slog('wait for MEER{0:02d} to be {}'.format(self.idx, self.meer_temp))
+        slog('wait for MEER{:02d} to be {}'.format(self.idx, self.meer_temp))
         ct = 0
         ov = cv
         while ct < MEER_TIMEOUT:
@@ -843,7 +844,7 @@ class Sample():
                 return
             if ct % 5 == 0 and abs(ov - cv) < MEER_PRECISION :
                 self.rerun_ms()
-        slog('driving MEER{0:02d} to {} failed with timeout'.format(did, self.meer_temp), True)
+        slog('driving MEER{:02d} to {} failed with timeout'.format(did, self.meer_temp), True)
         slog('continue the workflow even though MEER temperature not reached', True)
 
     def rerun_ms(self):
@@ -868,8 +869,6 @@ class Sample():
         global _driving_status
         global __is_collection_interrupted__
         if self.do_trans.value and len(self.trans_res.value.strip()) == 0:
-            if not self.meer_temp is None:
-                self.wait_for_meer()
             slog('start transmission collection for sample number ' + str(self.idx))
             if len(str(self.name_text.value)) > 0:
                 slog('transmission: ' + str(self.name_text.value))
@@ -889,6 +888,8 @@ class Sample():
                 slog('driving sample failed', True)
                 self.trans_stop_time = time.time()
                 raise
+            if not self.meer_temp is None:
+                self.wait_for_meer()
             try:
                 self.trans_res.value = _counting_status
                 act_next.enabled = True
@@ -961,6 +962,8 @@ class Sample():
                 slog('driving sample failed', True)
                 self.scatt_stop_time = time.time()
                 raise
+            if not self.meer_temp is None:
+                self.wait_for_meer()
             try:
                 self.scatt_res.value = _counting_status
                 act_next.enabled = True
