@@ -1713,7 +1713,7 @@ class SampleTable():
         else:
             pre.text = "#empty"
         
-        par = self.cmd_par.value.strip()
+        par = self.env_par.value.strip()
         if len(par) > 0:
             tr = SubElement(table, 'tr')
             th = SubElement(tr, 'th')
@@ -1721,7 +1721,7 @@ class SampleTable():
             th.text = "environment setup"
             th = SubElement(tr, 'td')
             th.set('colspan', '5')
-            th.text = self.cmd.title + ' ' + self.cmd.value.strip() + ' to ' + par
+            th.text = self.env_target.title + ' ' + self.env_target.value.strip() + ' to ' + par
 
         tr = SubElement(table, 'tr')
         th = SubElement(tr, 'th')
