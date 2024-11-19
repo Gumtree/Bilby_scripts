@@ -1756,9 +1756,9 @@ def set_meer_temp(wid):
     
 def save_temp_data():
     cfn = control.get_base_filename()
-    control.send_command('newfile HISTOGRAM_XYT')
+    control.async_command('newfile HISTOGRAM_XYT')
     time.sleep(0.5)
-    control.send_command('save')
+    control.async_command('save')
     t = 0
     fn = None
     while t < 5 :
@@ -2042,7 +2042,7 @@ def run_scan():
         pro_bar.selection = 0
         export_report()
         update_time()
-        control.send_command('hset /experiment/gumtree_time_estimate 0')
+        control.async_command('hset /experiment/gumtree_time_estimate 0')
 
 def get_next_block(owb = None):
     global workflow_list
@@ -2269,7 +2269,7 @@ def update_time():
         slog('estimated time left: ' + str(int(t)) + 's')
 #        par_time.value = _get_tstring(t)
         ft = int(time.time() + t)
-        control.send_command('hset /experiment/gumtree_time_estimate ' + str(ft))
+        control.async_command('hset /experiment/gumtree_time_estimate ' + str(ft))
         d = datetime.datetime.fromtimestamp(ft)
         td = datetime.datetime.today()
         fs = 'to finish at '
@@ -2327,7 +2327,7 @@ def pause_workflow():
         if not status is None and status.upper() == 'COUNTING':
             __workflow_paused__ = True
             act_pause.title = 'PAUSED, click to continue.'
-            control.execute('histmem veto on')
+            control.async_command('histmem veto on')
             slog('workflow is paused')
             act_pause.selected = True
         else:
@@ -2337,7 +2337,7 @@ def pause_workflow():
     else:
         __workflow_paused__ = False
         act_pause.title = 'Click to Pause'
-        control.execute('histmem veto off')
+        control.async_command('histmem veto off')
         slog('workflow is continued')
         act_pause.selected = False
     
@@ -2357,7 +2357,7 @@ def quit_counting():
     status = control.get_status()
     if not status is None and status.upper() == 'COUNTING':
         slog('stop counting and move to the next step')
-        control.execute('histmem pause')
+        control.async_command('histmem pause')
         __is_collection_interrupted__ = True
     else:
         slog('can not move to the next step at ' + str(status) + ' status', True)
