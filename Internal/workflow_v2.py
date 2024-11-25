@@ -1756,17 +1756,19 @@ def set_meer_temp(wid):
     
 def save_temp_data():
     cfn = control.get_base_filename()
+    print('old file name ' + cfn)
     control.async_command('newfile HISTOGRAM_XYT')
     time.sleep(0.5)
     control.async_command('save')
     t = 0
     fn = None
-    while t < 5 :
+    while t < 10 :
         fn = control.get_base_filename()
         if cfn != fn :
             break
         time.sleep(0.5)
         t += 0.5
+    print('new file name ' + fn)
     return fn
 
 def get_next_wid():
