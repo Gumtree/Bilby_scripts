@@ -282,33 +282,33 @@ def slog(text, f_err = False):
 def errlog(text):
     slog(text, True)
     
-class BatchStatusListener(control.MessageAdapter):
-    
-    def __init__(self):
-        pass
-    
-    def proxyConnected(self):
-        pass
-
-    def proxyConnectionReqested(self):
-        pass
-
-    def proxyDisconnected(self):
-        pass
-
-    def messageReceived(self, message):
-        logBook(str(message))
-
-    def messageSent(self, message, channelId):
-        pass
-
-try:
-    if '__batch_status_listener__' in globals():
-        control.proxy.removeMessageListener(__batch_status_listener__)
-except:
-    pass
-__batch_status_listener__ = BatchStatusListener()
-control.proxy.addMessageListener(__batch_status_listener__)
+#class BatchStatusListener(control.MessageAdapter):
+#    
+#    def __init__(self):
+#        pass
+#    
+#    def proxyConnected(self):
+#        pass
+#
+#    def proxyConnectionReqested(self):
+#        pass
+#
+#    def proxyDisconnected(self):
+#        pass
+#
+#    def messageReceived(self, message):
+#        logBook(str(message))
+#
+#    def messageSent(self, message, channelId):
+#        pass
+#
+#try:
+#    if '__batch_status_listener__' in globals():
+#        control.proxy.removeMessageListener(__batch_status_listener__)
+#except:
+#    pass
+#__batch_status_listener__ = BatchStatusListener()
+#control.proxy.addMessageListener(__batch_status_listener__)
 
 def __dataset_added__(fns = None):
     pass
@@ -336,13 +336,13 @@ class __Dispose_Listener__(DisposeListener):
         pass
     
 def __dispose_all__(event):
-    global __batch_status_listener__
+#    global __batch_status_listener__
 #    global __sics_console_event_handler_sent__
 #    global __sics_console_event_handler_received__
     global __statusListener__
     global __save_count_node__, __file_status_node__
     global __saveCountListener__, __fileStatusListener__
-    control.proxy.removeMessageListener(__batch_status_listener__)
+#    control.proxy.removeMessageListener(__batch_status_listener__)
 #    __sics_console_event_handler_sent__.deactivate()
 #    __sics_console_event_handler_received__.deactivate()
     __save_count_node__.removeControllerListener(__saveCountListener__)
@@ -2324,7 +2324,7 @@ def pause_workflow():
     
     if not __workflow_paused__:
         status = control.get_status()
-        if not status is None and status.upper() == 'COUNTING':
+        if not status is None and str(status).upper() == 'COUNTING':
             __workflow_paused__ = True
             act_pause.title = 'PAUSED, click to continue.'
             control.async_command('histmem veto on')
@@ -2355,7 +2355,7 @@ __is_collection_interrupted__ = False
 def quit_counting():
     global __is_collection_interrupted__
     status = control.get_status()
-    if not status is None and status.upper() == 'COUNTING':
+    if not status is None and str(status).upper() == 'COUNTING':
         slog('stop counting and move to the next step')
         control.async_command('histmem pause')
         __is_collection_interrupted__ = True
