@@ -28,6 +28,7 @@ from gumpy.lib import enum
 import random
 from Internal.logger import *
 
+sics = control
 # Script control setup area
 # script info
 __script__.title = 'Bilby Workflow'

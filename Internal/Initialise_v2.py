@@ -4,7 +4,8 @@ from org.eclipse.swt.widgets import TypedListener
 #from org.gumtree.util.messaging import EventHandler
 import sys, os
 sys.path.append(str(os.path.dirname(get_project_path('Internal'))))
-from Internal import sicsext, HISTORY_KEY_WORDS
+from Internal import sicsext_v2 as sicsext
+from Internal import HISTORY_KEY_WORDS
 #from Internal.sicsext import *
 from gumpy.control import control
 from au.gov.ansto.bragg.nbi.ui.scripting import ConsoleEventHandler
@@ -16,6 +17,8 @@ from time import strftime, localtime
 import traceback
 import socket
 from Internal.logger import *
+
+sics = control
 
 control.ready = False
 __script__.title = 'Initialised'
