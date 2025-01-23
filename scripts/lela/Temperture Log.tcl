@@ -13,9 +13,6 @@ logsetup /sample/tc1/loop_10/setpoint
 logsetup /sample/tc1/loop_11/setpoint
 logsetup /sample/tc1/loop_12/setpoint
 
-logsetup /sample/tc1/loop_01/cool_power 120
-logsetup /sample/tc1/loop_01/heat_power 120
-
 logsetup /sample/tc1/loop_01/sensor 120
 logsetup /sample/tc1/loop_02/sensor 120
 logsetup /sample/tc1/loop_03/sensor 120
@@ -30,8 +27,9 @@ logsetup /sample/tc1/loop_11/sensor 120
 logsetup /sample/tc1/loop_12/sensor 120
 
 logsetup /sample/tc2/Loop1/setpoint 
-logsetup /sample/tc2/Loop1/vTI 120
-logsetup /sample/tc2/Loop1/vTE 120
+logsetup /sample/tc2/Loop1/sensor 120
+logsetup /sample/tc2/Loop1/VTE 120
+logsetup /sample/tc2/Loop1/VTI 120
 
 logsetup /sample/tc3/Sensor/sensorValueC 120
 logsetup /sample/tc3/Sensor/sensorValueD 120
