@@ -55,13 +55,13 @@ while control.get_model() == None:
     time.sleep(1)
 
 #__model__ = control.get_model()
-__scan_status_node__ = control.get_controller('/commands/scan/runscan/feedback/status')
-__scan_variable_node__ = control.get_controller('/commands/scan/runscan/scan_variable')
+#__scan_status_node__ = control.get_controller('/commands/scan/runscan/feedback/status')
+#__scan_variable_node__ = control.get_controller('/commands/scan/runscan/scan_variable')
 __save_count_node__ = control.get_controller('/experiment/save_count')
 __file_name_node__ = control.get_controller('/experiment/file_name')
 __file_status_node__ = control.get_controller('/experiment/file_status')
 #saveCount = int(saveCountNode.getValue().getIntData())
-__cur_status__ = str(__scan_status_node__.getValue())
+#__cur_status__ = str(__scan_status_node__.getValue())
 __file_name__ = str(__file_name_node__.getValue())
 __data_file_timestamp__ = 0
 
@@ -311,6 +311,30 @@ def errlog(text):
 #__batch_status_listener__ = BatchStatusListener()
 #control.proxy.addMessageListener(__batch_status_listener__)
 
+def renew_controllers():
+    global __save_count_node__, __file_status_node__, __file_name_node__
+    global __saveCountListener__, __fileStatusListener__
+    global __file_name__
+    slog("re-initialise proxy model after re-connection")
+    if __save_count_node__ != None:
+        __save_count_node__.removeControllerListener(__saveCountListener__)
+    if __file_status_node__ != None:
+        __file_status_node__.removeControllerListener(__fileStatusListener__)
+    __save_count_node__ = control.get_controller('/experiment/save_count')
+    __file_status_node__ = control.get_controller('/experiment/file_status')
+    __file_name_node__ = control.get_controller('/experiment/file_name')
+    __file_name__ = str(__file_name_node__.getValue())
+    __save_count_node__.addControllerListener(__saveCountListener__)
+    __file_status_node__.addControllerListener(__fileStatusListener__)
+
+class ProxyModelListener(control.ProxyAdapter):
+    
+    def modelUpdated(self):
+        renew_controllers()
+        
+__proxy_model_listener__ = ProxyModelListener()
+control.proxy.addProxyListener(__proxy_model_listener__)
+
 def __dataset_added__(fns = None):
     pass
 
@@ -337,17 +361,18 @@ class __Dispose_Listener__(DisposeListener):
         pass
     
 def __dispose_all__(event):
-#    global __batch_status_listener__
+    global __batch_status_listener__
 #    global __sics_console_event_handler_sent__
 #    global __sics_console_event_handler_received__
-    global __statusListener__
+#    global __statusListener__
     global __save_count_node__, __file_status_node__
     global __saveCountListener__, __fileStatusListener__
-#    control.proxy.removeMessageListener(__batch_status_listener__)
+    control.proxy.removeMessageListener(__batch_status_listener__)
 #    __sics_console_event_handler_sent__.deactivate()
 #    __sics_console_event_handler_received__.deactivate()
     __save_count_node__.removeControllerListener(__saveCountListener__)
     __file_status_node__.removeControllerListener(__fileStatusListener__)
+    control.proxy.removeProxyListener(__proxy_model_listener__)
 #    if __buffer_logger__:
 #        __buffer_logger__.close()
 #    if __history_logger__:
@@ -1760,7 +1785,7 @@ def save_temp_data():
     slog('old file name ' + cfn)
     control.async_command('newfile HISTOGRAM_XYT')
     time.sleep(2)
-    slog('waited for half seconds')
+    slog('waited for two seconds')
     control.async_command('save')
     t = 0
     fn = None
