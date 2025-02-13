@@ -315,16 +315,19 @@ def renew_controllers():
     global __saveCountListener__, __fileStatusListener__
     global __file_name__
     slog("re-initialise proxy model after re-connection")
-    if __save_count_node__ != None:
-        __save_count_node__.removeControllerListener(__saveCountListener__)
-    if __file_status_node__ != None:
-        __file_status_node__.removeControllerListener(__fileStatusListener__)
-    __save_count_node__ = control.get_controller('/experiment/save_count')
-    __file_status_node__ = control.get_controller('/experiment/file_status')
-    __file_name_node__ = control.get_controller('/experiment/file_name')
-    __file_name__ = str(__file_name_node__.getValue())
-    __save_count_node__.addControllerListener(__saveCountListener__)
-    __file_status_node__.addControllerListener(__fileStatusListener__)
+    try:
+        if __save_count_node__ != None:
+            __save_count_node__.removeControllerListener(__saveCountListener__)
+        if __file_status_node__ != None:
+            __file_status_node__.removeControllerListener(__fileStatusListener__)
+        __save_count_node__ = control.get_controller('/experiment/save_count')
+        __file_status_node__ = control.get_controller('/experiment/file_status')
+        __file_name_node__ = control.get_controller('/experiment/file_name')
+        __file_name__ = str(__file_name_node__.getValue())
+        __save_count_node__.addControllerListener(__saveCountListener__)
+        __file_status_node__.addControllerListener(__fileStatusListener__)
+    except :
+        traceback.print_exc(file=sys.stdout)
     slog("re-initialise proxy done")
 
 class ProxyModelListener(control.ProxyAdapter):
