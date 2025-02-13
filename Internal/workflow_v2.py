@@ -36,7 +36,6 @@ __script__.version = '2.1'
 
 MEER_TIMEOUT = 300
 MEER_RETRY_CYCLE = 5
-MEER_PRECISION = 0.1
             
 control.ready = False
 
@@ -838,7 +837,8 @@ class Sample():
         if self.meer_temp is None:
             return
         cv = control.get_ms(self.idx)
-        if abs(cv - float(self.meer_temp)) < MEER_PRECISION :
+        tol = control.get_ms_tolerance(self.idx)
+        if abs(cv - float(self.meer_temp)) <  tol :
             slog('MEER{:02d} is at {}'.format(self.idx, self.meer_temp))
             return
         slog('wait for MEER{:02d} to be {}'.format(self.idx, self.meer_temp))
@@ -848,10 +848,11 @@ class Sample():
             time.sleep(0.5)
             ct += 0.5
             cv = control.get_ms(self.idx)
+            tol = control.get_ms_tolerance(self.idx)
             control.handle_interrupt()
-            if abs(cv - float(self.meer_temp)) < MEER_PRECISION :
+            if abs(cv - float(self.meer_temp)) < tol :
                 return
-            if ct % 5 == 0 and abs(ov - cv) < MEER_PRECISION :
+            if ct % 5 == 0 and abs(ov - cv) < tol :
                 self.rerun_ms()
         slog('driving MEER{:02d} to {} failed with timeout'.format(did, self.meer_temp), True)
         slog('continue the workflow even though MEER temperature not reached', True)
