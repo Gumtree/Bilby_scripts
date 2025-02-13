@@ -314,6 +314,7 @@ def renew_controllers():
     global __save_count_node__, __file_status_node__, __file_name_node__
     global __saveCountListener__, __fileStatusListener__
     global __file_name__
+    slog("re-initialise proxy model after re-connection")
     if __save_count_node__ != None:
         __save_count_node__.removeControllerListener(__saveCountListener__)
     if __file_status_node__ != None:
@@ -324,7 +325,7 @@ def renew_controllers():
     __file_name__ = str(__file_name_node__.getValue())
     __save_count_node__.addControllerListener(__saveCountListener__)
     __file_status_node__.addControllerListener(__fileStatusListener__)
-    slog("re-initialise proxy model after re-connection")
+    slog("re-initialise proxy done")
 
 class ProxyModelListener(control.ProxyAdapter):
     
