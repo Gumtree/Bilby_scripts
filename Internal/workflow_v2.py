@@ -34,8 +34,8 @@ sics = control
 __script__.title = 'Bilby Workflow'
 __script__.version = '2.1'
 
-MEER_TIMEOUT = 300
-MEER_RETRY_CYCLE = 5
+MEER_TIMEOUT = 600
+MEER_RETRY_CYCLE = 20
             
 control.ready = False
 
