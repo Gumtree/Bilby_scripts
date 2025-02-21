@@ -2204,10 +2204,11 @@ def load_workflow():
             if type(wl[0]) is int or type(wl[0]) is str or type(wl[0]) is unicode:
                 stage = str(wl[0])
                 wl = wl[1:]
-                if stage != par_stage.value:
+                if stage != par_stage.value and stage != None and len(stage.strip()) > 0:
                     par_stage.value = stage
                     bilby.__sampleStage__ = stage
                     __sample_stage_name__ = stage
+                    slog("apply sample statge: " + str(stage))
                     for i in xrange(len(workflow_list)):
                         rmv = workflow_list.pop()
                         if rmv is None:
@@ -2247,7 +2248,8 @@ def export_workflow(path = None):
     slog('workflow exported to ' + path)
     file = open(path, 'wb')
     wf_rep = []
-    wf_rep.append(par_stage.value)
+#    wf_rep.append(par_stage.value)
+    wf_rep.append(__sample_stage_name__)
     for wb in workflow_list:
         wf_rep.append(wb.to_rep())
     try:
