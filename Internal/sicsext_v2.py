@@ -1,6 +1,7 @@
 from gumpy.control import control
 import os
 import time
+from gumpy.commons import logger
 from org.gumtree.gumnix.sics.io import SicsCallbackAdapter
 from org.gumtree.gumnix.sics.control import ServerStatus
 from org.gumtree.gumnix.sics.batch.ui.util import SicsBatchUIUtils
@@ -39,9 +40,10 @@ def runscan(scan_variable, scan_start, scan_stop, numpoints, mode, preset, comm 
     time.sleep(1)
     
     # Run scan
-    print 'Scan started'
+    print 'Scan starting'
 #    scanController.asyncExecute()
-    control.execute('hset ' + cpath + ' start')
+#    control.execute('hset ' + cpath + ' start')
+    control.async_command('hset ' + cpath + ' start', True)
     
     # Monitor initial status change
     try:
