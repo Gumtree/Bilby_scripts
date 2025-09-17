@@ -1,5 +1,8 @@
+a=3
+print "before loading"
 from gumpy.commons.logger import log
 import pickle
+import abc
 import datetime
 from java.text import SimpleDateFormat
 import time
@@ -364,13 +367,13 @@ class __Dispose_Listener__(DisposeListener):
         pass
     
 def __dispose_all__(event):
-    global __batch_status_listener__
+#    global __batch_status_listener__
 #    global __sics_console_event_handler_sent__
 #    global __sics_console_event_handler_received__
 #    global __statusListener__
     global __save_count_node__, __file_status_node__
     global __saveCountListener__, __fileStatusListener__
-    control.proxy.removeMessageListener(__batch_status_listener__)
+#    control.proxy.removeMessageListener(__batch_status_listener__)
 #    __sics_console_event_handler_sent__.deactivate()
 #    __sics_console_event_handler_received__.deactivate()
     __save_count_node__.removeControllerListener(__saveCountListener__)
@@ -440,7 +443,209 @@ _scatt_setup_time = 1 * 60
 _drive_sample_time = 20
 _default_config_name = "L1=#_L2=#_ctn=#_name=WB"
 
-class WorkflowBlock():
+class AbstractBlock(object) :
+    __metaclass__ = abc.ABCMeta
+    
+    @abc.abstractmethod
+    def set_enabled(self):
+        pass
+            
+    @abc.abstractmethod
+    def is_enabled(self):
+        return self.enabled.value
+    
+    @abc.abstractmethod
+    def __copy__(self):
+        pass
+        
+    @abc.abstractmethod
+    def __eq__(self, other):
+        if isinstance(other, WorkflowBlock):
+            return self.wid == other.wid
+        return False
+
+    @abc.abstractmethod
+    def __ne__(self, other):
+        if isinstance(other, WorkflowBlock):
+            return self.wid != other.wid
+        return True
+        
+    @abc.abstractmethod
+    def dispose(self):
+        pass
+        
+    @abc.abstractmethod
+    def get_title(self):
+        return "abstract block"
+
+    @abc.abstractmethod
+    def run(self):
+        pass
+        
+    @abc.abstractmethod
+    def to_rep(self):
+        pass
+    
+    @abc.abstractmethod
+    def from_rep(self, rep):
+        pass
+    
+    @abc.abstractmethod
+    def need_to_run(self):
+        return False
+    
+    @abc.abstractmethod
+    def get_time_estimation(self):
+        return 0
+        
+    @abc.abstractmethod
+    def reset_result(self):
+        pass
+            
+    @abc.abstractmethod
+    def append_xml(self, parent):
+        pass
+
+    @abc.abstractmethod
+    def get_html(self):
+        return ''
+
+class CommandBlock(AbstractBlock):
+    def __init__(self):
+        global __workflow_seq__
+#        self.wid = uuid.uuid1()
+        self.wid = get_next_wid()
+        __workflow_seq__ += 1
+        self.seq = __workflow_seq__
+#        tt = 'Command Block #' + str(self.wid)
+#        tt = _default_config_name + str(self.seq)
+        gc = Group('Command Block #' + str(self.seq))
+        gc.colspan = 4
+        gc.numColumns = 4
+        cenabled = Par('bool', True, command = 'set_enabled(' + str(self.wid) + ')')
+        cenabled.title = 'enable/disable'
+        cenabled.tool_tip = 'click to enable or disable this block'
+        cenabled.colspan = 1
+        cremove = Act('remove_block(' + str(self.wid) + ')', 'Remove This Block')
+        cremove.tool_tip = 'Click to remove this block from the workflow'
+#        cremove = Act('run1()', 'Remove This Block')
+        cremove.name = 'cremove_' + str(self.wid)
+        cremove.independent = True
+        cremove.colspan = 1
+        globals()[str(cremove.name)] = cremove
+        cnew = Act('insert_block(' + str(self.wid) + ')', 'Add Collection Block Below')
+        cnew.name = 'cnew_' + str(self.wid)
+        cnew.tool_tip = 'Click to add/insert a new collection block below'
+        cnew.colspan = 2
+        cnew.independent = True
+        globals()[str(cnew.name)] = cnew
+        ctext = Par('string', '')
+        ctext.height = 60
+        ctext.rowspan = 2
+        ctext.colspan = 2
+        ctext.title = 'commands'
+        gc.add(cenabled, cremove, ctext, cnew)
+        self.group = gc
+        self.enabled = cenabled
+        self.remove = cremove
+        self.new_block = cnew
+        self.text = ctext
+        self.is_running = False
+        self.config_start_time = 0
+        self.config_stop_time = 0
+
+    def get_title(self):
+        return 'Command Block #' + str(self.seq) 
+        
+    def set_enabled(self):
+        flag = self.enabled.value
+#        self.remove.enable = flag
+        self.text.enabled = flag
+        if flag:
+            slog('block #' + str(self.seq) + ' is enabled')
+        else:
+            slog('block #' + str(self.seq) + ' is disabled')
+#        update_progress()
+        
+    def is_enabled(self):
+        return self.enabled.value
+    
+    def __copy__(self):
+        pass
+        
+    def __eq__(self, other):
+        if isinstance(other, CommandBlock):
+            return self.wid == other.wid
+        return False
+
+    def __ne__(self, other):
+        if isinstance(other, CommandBlock):
+            return self.wid != other.wid
+        return True
+        
+    def dispose(self):
+        self.enabled.dispose()
+        self.remove.dispose()
+        self.text.dispose()
+        self.new_block.dispose()
+        self.group.dispose()
+        
+    def run(self):
+        tt = self.group.name
+        slog('start block: ' + str(tt))
+        if self.need_to_run() :
+            self.remove.enabled = False
+            self.text.enabled = False
+            self.group.highlight = True
+            self.is_running = True
+#            self.new_block.enabled = False
+            try:
+                slog('running command script')
+                self.config_stop_time = 0
+                self.config_start_time = time.time()
+                try:
+                    exec(str(self.text.value))
+                finally:
+                    self.config_stop_time = time.time()
+                slog('block finished: ' + str(tt))
+            finally:
+                self.group.highlight = False
+                self.remove.enabled = True
+                self.text.enabled = True
+                self.is_running = False
+#                self.new_block.enabled = True
+        else:
+            slog('block: ' + tt + ' skipped')
+        
+    def to_rep(self):
+        rep = dict()
+        rep['type'] = "CMD"
+        rep['text'] = self.text.value
+        return rep
+    
+    def from_rep(self, rep):
+        if rep.has_key('text'):
+            self.text.value = rep['text']
+        else:
+            self.text.value = ''
+    
+    def need_to_run(self):
+        return True
+    
+    def get_time_estimation(self):
+        return 0
+        
+    def reset_result(self):
+        pass
+
+    def append_xml(self, parent):
+        pass
+    
+    def get_html(self):
+        return ''
+
+
+class WorkflowBlock(AbstractBlock):
     def __init__(self):
         global __workflow_seq__
 #        self.wid = uuid.uuid1()
@@ -451,12 +656,13 @@ class WorkflowBlock():
 #        self.samples = samples
 #        tt = 'Workflow Block #' + str(self.wid)
         tt = _default_config_name + str(self.seq)
-        gc = Group('Workflow Block #' + str(self.seq))
+        gc = Group('Collection Block #' + str(self.seq))
         gc.colspan = 4
         gc.numColumns = 4
         cenabled = Par('bool', True, command \
                        = 'set_enabled(' + str(self.wid) + ')')
         cenabled.title = 'enable/disable'
+        cenabled.tool_tip = 'click to enable or disable this block'
         cremove = Act('remove_block(' + str(self.wid) + ')', 'Remove This Block')
         cremove.tool_tip = 'Click to remove this block from the workflow'
 #        cremove = Act('run1()', 'Remove This Block')
@@ -485,7 +691,7 @@ class WorkflowBlock():
         ctest.name = 'ctest_' + str(self.wid)
         globals()[str(ctest.name)] = ctest
         ctext = Par('string', '')
-        ctext.height = 60
+        ctext.height = 80
         ctext.rowspan = 3
         ctext.colspan = 2
         ctext.title = 'configuration'
@@ -518,6 +724,9 @@ class WorkflowBlock():
 #    def update_title(self):
 #        self.group.name = str(self.title.value)
 #        self.group.title = str(self.title.value)
+        
+    def get_title(self):
+        return self.title.value
         
     def set_enabled(self):
         flag = self.enabled.value
@@ -602,6 +811,7 @@ class WorkflowBlock():
         
     def to_rep(self):
         rep = dict()
+        rep['type'] = 'CLT'
         rep['title'] = self.title.value
         rep['config'] = self.config.value
         rep['trans_setup'] = self.table.trans_setup.value
@@ -1901,7 +2111,7 @@ def remove_block(wid = None):
     else:
         wb = get_workflow_block(wid)
         if not wb is None:
-            tt = 'Block ' + str(wb.title.value) + ' removed'
+            tt = 'Block ' + str(wb.get_title()) + ' removed'
             try:
                 workflow_list.remove(wb)
                 wb.dispose()
@@ -1933,17 +2143,31 @@ def get_new_filename(old_filename = None, timeout = 5):
         time.sleep(0.5)
         t += 0.5
     return fn
-    
+
+def _find_nearest_collection_block(idx):
+    find = None
+    for i in xrange(idx, -1, -1):
+        wb = workflow_list[i]
+        if isinstance(wb, WorkflowBlock) :
+            find = wb
+            break
+    return find
+        
 def insert_block(wid):
     global workflow_list
     global _default_config_name
     old = None
+    cur = None
     idx = -1
-    for i in xrange(len(workflow_list)):
+    for i in xrange(len(workflow_list) - 1, -1, -1):
         wb = workflow_list[i]
         if wb.wid == wid:
             idx = i
-            old = wb
+            cur = wb
+            if isinstance(wb, WorkflowBlock) :
+                old = wb
+            else :
+                old = _find_nearest_collection_block(idx - 1)
             break
     if idx < 0:
         add_block()
@@ -1952,43 +2176,49 @@ def insert_block(wid):
         workflow_list.insert(idx + 1, wb)
         slog('block #' + str(wb.seq) + ' inserted')
         try:
-            wb.group.moveAfterObject(old.group)
+            wb.group.moveAfterObject(cur.group)
         except:
             slog('failed to put block to correct index', True)
-        try:
-            wb.config.value = old.config.value
-            config_name = old.title.value
-            if not config_name.startswith(_default_config_name):
-                wb.title.value = old.title.value
-            wb.table.t3.value = old.table.t3.value
-            wb.table.t5.value = old.table.t5.value
-            wb.table.trans_time.value = old.table.trans_time.value
-            wb.table.scatt_time.value = old.table.scatt_time.value
-            wb.table.thickness.value = old.table.thickness.value
-            wb.table.trans_setup.value = old.table.trans_setup.value
-            wb.table.scatt_setup.value = old.table.scatt_setup.value
-            wb.table.env_target.value = old.table.env_target.value
-            wb.table.env_par.value = old.table.env_par.value
-            for i in wb.table.samples:
-                sample = wb.table.samples[i]
-                old_sample = old.table.samples[i]
-                sample.name_text.value = old_sample.name_text.value
-                sample.thickness.value = old_sample.thickness.value
-                sample.do_trans.value = old_sample.do_trans.value
-                sample.trans_time.value = old_sample.trans_time.value
-                sample.do_scatt.value = old_sample.do_scatt.value
-                sample.scatt_time.value = old_sample.scatt_time.value
-            wb.table.set_meer_temp()
-        finally:
+        if not old is None :
+            try:
+                wb.config.value = old.config.value
+                config_name = old.title.value
+                if not config_name.startswith(_default_config_name):
+                    wb.title.value = old.title.value
+                wb.table.t3.value = old.table.t3.value
+                wb.table.t5.value = old.table.t5.value
+                wb.table.trans_time.value = old.table.trans_time.value
+                wb.table.scatt_time.value = old.table.scatt_time.value
+                wb.table.thickness.value = old.table.thickness.value
+                wb.table.trans_setup.value = old.table.trans_setup.value
+                wb.table.scatt_setup.value = old.table.scatt_setup.value
+                wb.table.env_target.value = old.table.env_target.value
+                wb.table.env_par.value = old.table.env_par.value
+                for i in wb.table.samples:
+                    sample = wb.table.samples[i]
+                    old_sample = old.table.samples[i]
+                    sample.name_text.value = old_sample.name_text.value
+                    sample.thickness.value = old_sample.thickness.value
+                    sample.do_trans.value = old_sample.do_trans.value
+                    sample.trans_time.value = old_sample.trans_time.value
+                    sample.do_scatt.value = old_sample.do_scatt.value
+                    sample.scatt_time.value = old_sample.scatt_time.value
+                wb.table.set_meer_temp()
+            finally:
+                __UI__.updateUI()
+        else:
             __UI__.updateUI()
     update_progress()
                 
 def add_block():
     global workflow_list
     global _default_config_name
-    old = None
-    if len(workflow_list) > 0 :
-        old = workflow_list[-1]
+#    old = None
+#    if len(workflow_list) > 0 :
+#        old = workflow_list[-1]
+#        if not isinstance(old, WorkflowBlock) :
+#            old = _find_nearest_collection_block(len(workflow_list - 1))
+    old = _find_nearest_collection_block(len(workflow_list) - 1)
     wb = WorkflowBlock()
     workflow_list.append(wb)
     slog("add new workflow block " + str(wb.seq))
@@ -2019,6 +2249,13 @@ def add_block():
             wb.table.set_meer_temp()
     finally:
         __UI__.updateUI()
+        
+def add_cmd_block():
+    global workflow_list
+    wb = CommandBlock()
+    workflow_list.append(wb)
+    slog("add new command block " + str(wb.seq))
+    __UI__.updateUI()
 
 def run_scan():
     global _is_running
@@ -2047,7 +2284,7 @@ def run_scan():
         path += '/workflow_' + strftime("%Y-%m-%dT%H-%M-%S", localtime()) + '.pkl'
         export_workflow(path)
     except:
-        slog('faied to auto save', True)
+        slog('failed to auto save', True)
     try:
         slog('start Bilby workflow')
         for wb in workflow_list:
@@ -2215,15 +2452,26 @@ def load_workflow():
                             errlog('failed to pop item from workflow list')
                         else:
                             rmv.dispose()
-            if len(wl) > len(workflow_list) :
-                for i in xrange(len(wl) - len(workflow_list)):
-                    workflow_list.append(WorkflowBlock())
-            elif len(wl) < len(workflow_list) :
-                for i in xrange(len(workflow_list) - len(wl)):
-                    rmv = workflow_list.pop()
-                    rmv.dispose()
+#            if len(wl) > len(workflow_list) :
+#                for i in xrange(len(wl) - len(workflow_list)):
+#                    workflow_list.append(WorkflowBlock())
+#            elif len(wl) < len(workflow_list) :
+#                for i in xrange(len(workflow_list) - len(wl)):
+#                    rmv = workflow_list.pop()
+#                    rmv.dispose()
+#            for i in xrange(len(wl)):
+#                workflow_list[i].from_rep(wl[i])
+            for i in xrange(len(workflow_list)):
+                rmv = workflow_list.pop()
+                rmv.dispose()
             for i in xrange(len(wl)):
-                workflow_list[i].from_rep(wl[i])
+                item = wl[i]
+                if 'type' in item and item['type'] == 'CMD':
+                    b = CommandBlock()
+                else:
+                    b = WorkflowBlock()
+                b.from_rep(item)
+                workflow_list.append(b)
             slog('workflow loaded from ' + str(fn))
         else:
             slog('invalid workflow file at ' + str(fn), True)
@@ -2473,7 +2721,11 @@ act_next.colspan = 2
 act_add = Act('add_block()', 'Add Workflow Block')
 act_add.independent = True 
 act_add.tool_tip = 'Click to add a new block to the end of the workflow'
-act_add.colspan = 2
+act_add.colspan = 1
+act_cmd = Act('add_cmd_block()', 'Add Command Block')
+act_cmd.independent = True 
+act_cmd.tool_tip = 'Click to add a command block to the end of the workflow'
+act_cmd.colspan = 1
 act_run = Act('run_scan()', 'Run Bilby Workflow')
 act_run.tool_tip = 'Click to run the workflow'
 act_run.colspan = 2
