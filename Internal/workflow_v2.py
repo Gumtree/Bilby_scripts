@@ -1,5 +1,3 @@
-a=3
-print "before loading"
 from gumpy.commons.logger import log
 import pickle
 import abc

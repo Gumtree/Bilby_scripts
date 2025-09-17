@@ -339,6 +339,7 @@ def __std_run_script__(fns):
 #                if ds[0].location == fn:
 #                    return
             df.datasets.clear()
+            log("loading " + fn)
             ds = df[fn]
             axis_name.value = ds.axes[0].name
             dname = str(data_name.value)
