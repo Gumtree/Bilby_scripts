@@ -800,9 +800,13 @@ class WorkflowBlock(AbstractBlock):
                 self.config.enabled = True
                 self.is_running = False
                 html = self.get_html()
+                slog('finalise block run: ' + self.get_title())
                 if not html is None:
                     slog('upload scan result to notebook database')
                     n_logger.log_table(html)
+                else:
+                    slog('Error: empty scan table', True)
+                    n_logger.log_text('Error: empty scan table')
 #                self.new_block.enabled = True
         else:
             slog('block: ' + str(self.title.value) + ' skipped')
