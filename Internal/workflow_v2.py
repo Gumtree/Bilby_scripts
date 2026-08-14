@@ -2265,12 +2265,14 @@ def run_scan():
     is_ready = False
     bm_msg = ''
     try:
-#        is_ready = control.get_value('/instrument/sis/status/ready') == 'TRUE'
-        slog('test instrument ready ...')
-        (is_ready,bm_msg) = is_beam_open()
-    except Exception as e:
-        is_ready = False
-        bm_msg = 'Failed to communicate with beam monitor server. ' + str(e)
+        is_ready = control.get_value('/instrument/sis/status/ready') == 'TRUE'
+    except: 
+        try:
+            slog('test instrument ready with beam monitor server ...')
+            (is_ready,bm_msg) = is_beam_open()
+        except Exception as e:
+            is_ready = False
+            bm_msg = 'Failed to communicate with beam monitor server. ' + str(e)
     if not is_ready:
         is_confirmed = open_question('The instrument is not ready '\
                     + 'according to the SIS status. ' + bm_msg + 'Please get the '\
