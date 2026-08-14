@@ -395,7 +395,7 @@ control.ready = True
 # The type can be string, int, float, bool, file.
 
 # Use below example to create a button
-__sample_stage_name__ = '12'
+__sample_stage_name__ = 'meer16'
 bilby.__sampleStage__ = __sample_stage_name__
 #try:
 #    uplim = sics.get_raw_value('samx softupperlim')
@@ -800,9 +800,13 @@ class WorkflowBlock(AbstractBlock):
                 self.config.enabled = True
                 self.is_running = False
                 html = self.get_html()
+                slog('finalise block run: ' + self.get_title())
                 if not html is None:
                     slog('upload scan result to notebook database')
                     n_logger.log_table(html)
+                else:
+                    slog('Error: empty scan table', True)
+                    n_logger.log_text('Error: empty scan table')
 #                self.new_block.enabled = True
         else:
             slog('block: ' + str(self.title.value) + ' skipped')
