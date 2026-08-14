@@ -33,7 +33,7 @@ sics = control
 # Script control setup area
 # script info
 __script__.title = 'Bilby Workflow'
-__script__.version = '2.1'
+__script__.version = '2.3'
 
 MEER_TIMEOUT = 600
 MEER_RETRY_CYCLE = 20
@@ -2259,13 +2259,17 @@ def run_scan():
     global _is_running
     global _start_timestamp
     is_ready = False
+    bm_msg = ''
     try:
-        is_ready = control.get_value('/instrument/sis/status/ready') == 'TRUE'
-    except:
-        pass
+#        is_ready = control.get_value('/instrument/sis/status/ready') == 'TRUE'
+        slog('test instrument ready ...')
+        (is_ready,bm_msg) = is_beam_open()
+    except Exception as e:
+        is_ready = False
+        bm_msg = 'Failed to communicate with beam monitor server. ' + str(e)
     if not is_ready:
         is_confirmed = open_question('The instrument is not ready '\
-                    + 'according to the SIS status. Please get the '\
+                    + 'according to the SIS status. ' + bm_msg + 'Please get the '\
                     + 'instrument ready. Then click on "Yes" to continue. \n'\
                     + 'Do you want to continue?')
         if not is_confirmed:
@@ -2668,6 +2672,43 @@ def select_stage():
     add_block()
     slog(str(__sample_stage_name__) + ' sample stage selected')
     
+import urllib2
+import re
+
+_COUNTING_TIME = 2
+_RATE_LIMIT = 100
+
+def get_bm_count():
+    base_url = 'http://bm2-bilby.nbi.ansto.gov.au:30000/'
+    start_url = base_url + 'cmd=start'
+    r = urllib2.urlopen(start_url)
+    if r.code != 200:
+        raise 'error open the url'
+    sleep(3)
+    stop_url = base_url + 'cmd=stop'
+    urllib2.urlopen(stop_url)
+    page_url = base_url + 'page'
+    page = urllib2.urlopen(page_url).read()
+    counter = None
+    rate = None
+    for row in re.findall(r'<tr[^>]*>(.*?)</tr>', page, re.S):
+        cells = re.findall(r'<td[^>]*>(.*?)</td>', row, re.S)
+        cells = [re.sub(r'<[^>]+>', '', cell).strip() for cell in cells]
+        if len(cells) >= 2:
+            if cells[0] == 'Counter':
+                counter = cells[1]
+            elif cells[0] == 'Rate':
+                rate = cells[1]
+    return (counter, rate)
+
+def is_beam_open():
+    global _RATE_LIMIT
+    bm_v = get_bm_count()
+    if float(bm_v[1]) > _RATE_LIMIT:
+        return (True, '')
+    else:
+        return (False, 'Beam counter rate is {}. '.format(bm_v[1]))
+    
 #def upload_html(wid):
 #    bl = get_workflow_block(wid)
 #    if not bl is None:
@@ -2716,7 +2757,7 @@ act_next.enabled = False
 act_next.tool_tip = 'Click to quit counting, and move to the next collection point'
 act_next.colspan = 2
 
-act_add = Act('add_block()', 'Add Workflow Block')
+act_add = Act('add_block()', 'Add Collection Block')
 act_add.independent = True 
 act_add.tool_tip = 'Click to add a new block to the end of the workflow'
 act_add.colspan = 1
