@@ -2274,13 +2274,16 @@ def run_scan():
     except Exception as e:
         is_ready = False
         bm_msg = 'Failed to communicate with beam monitor server. ' + str(e)
+    slog(bm_msg)
     if not is_ready:
         is_confirmed = open_question('The instrument is not ready '\
                     + 'according to the SIS status. ' + bm_msg + 'Please get the '\
                     + 'instrument ready. Then click on "Yes" to continue. \n'\
                     + 'Do you want to continue?')
-        if not is_confirmed:
-            slog('Instrument is not ready. Quit the workflow.', True)
+        if is_confirmed:
+            slog('User chose to continue with the workflow.')
+        else:
+            slog('Instrument is not ready. User chose to quit the workflow.', True)
             return
     act_load.enabled = False
     act_run.enabled = False
@@ -2685,13 +2688,13 @@ import re
 _COUNTING_TIME = 2
 _RATE_LIMIT = 100
 
-def get_bm_count():
+def get_bm_count(count_time = _COUNTING_TIME):
     base_url = 'http://bm2-bilby.nbi.ansto.gov.au:30000/'
     start_url = base_url + 'cmd=start'
     r = urllib2.urlopen(start_url)
     if r.code != 200:
         raise 'error open the url'
-    sleep(3)
+    sleep(count_time)
     stop_url = base_url + 'cmd=stop'
     urllib2.urlopen(stop_url)
     page_url = base_url + 'page'
@@ -2709,12 +2712,23 @@ def get_bm_count():
     return (counter, rate)
 
 def is_beam_open():
-    global _RATE_LIMIT
-    bm_v = get_bm_count()
-    if float(bm_v[1]) > _RATE_LIMIT:
-        return (True, '')
-    else:
-        return (False, 'Beam counter rate is {}. '.format(bm_v[1]))
+    global _RATE_LIMIT, _COUNTING_TIME
+    _ct = 0
+    _retry = 3
+    while _ct < _retry :
+        _ct += 1
+        try:
+            bm_v = get_bm_count(_COUNTING_TIME * _ct)
+        except:
+            if _ct >= _retry :
+                raise
+            else:
+                sleep(2)
+                continue
+        if float(bm_v[1]) > _RATE_LIMIT:
+            return (True, 'Beam counter rate is {} after {} test{}. '.format(
+                    bm_v[1], _ct, 's' if _ct > 1 else ''))
+    return (False, 'Beam counter rate is {} after {} tests. '.format(bm_v[1], _ct))
     
 #def upload_html(wid):
 #    bl = get_workflow_block(wid)
