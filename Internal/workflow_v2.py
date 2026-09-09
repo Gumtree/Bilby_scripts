@@ -2686,7 +2686,7 @@ import urllib2
 import re
 
 _COUNTING_TIME = 2
-_RATE_LIMIT = 100
+_RATE_LIMIT = 5000
 
 def get_bm_count(count_time = _COUNTING_TIME):
     base_url = 'http://bm2-bilby.nbi.ansto.gov.au:30000/'
