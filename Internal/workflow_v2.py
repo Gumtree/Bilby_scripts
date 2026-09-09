@@ -2687,6 +2687,7 @@ import re
 
 _COUNTING_TIME = 2
 _RATE_LIMIT = 500
+_COUNT_RETRY = 5
 
 def get_bm_count(count_time = _COUNTING_TIME):
     base_url = 'http://bm2-bilby.nbi.ansto.gov.au:30000/'
@@ -2717,9 +2718,9 @@ def get_bm_count(count_time = _COUNTING_TIME):
     return (counter, rate)
 
 def is_beam_open():
-    global _RATE_LIMIT, _COUNTING_TIME
+    global _RATE_LIMIT, _COUNTING_TIME, _COUNT_RETRY
     _ct = 0
-    _retry = 3
+    _retry = _COUNT_RETRY
     while _ct < _retry :
         _ct += 1
         try:
