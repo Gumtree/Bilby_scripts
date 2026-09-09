@@ -2273,7 +2273,7 @@ def run_scan():
         (is_ready,bm_msg) = is_beam_open()
     except Exception as e:
         is_ready = False
-        bm_msg = 'Failed to communicate with beam monitor server. ' + str(e)
+        bm_msg = 'Failed to communicate with beam monitor server. ' + str(e) + ' \n'
     slog(bm_msg)
     if not is_ready:
         is_confirmed = open_question('The instrument is not ready '\
@@ -2686,14 +2686,14 @@ import urllib2
 import re
 
 _COUNTING_TIME = 2
-_RATE_LIMIT = 5000
+_RATE_LIMIT = 500
 
 def get_bm_count(count_time = _COUNTING_TIME):
     base_url = 'http://bm2-bilby.nbi.ansto.gov.au:30000/'
     start_url = base_url + 'cmd=start'
     r = urllib2.urlopen(start_url)
     if r.code != 200:
-        raise 'error open the url'
+        raise Exception('error open the url. ')
     sleep(count_time)
     stop_url = base_url + 'cmd=stop'
     urllib2.urlopen(stop_url)
@@ -2709,6 +2709,11 @@ def get_bm_count(count_time = _COUNTING_TIME):
                 counter = cells[1]
             elif cells[0] == 'Rate':
                 rate = cells[1]
+    try:
+        rate = float(counter) / float(count_time)
+    except:
+        raise Exception('failed to load counter and rate from server.')
+    slog('BM server returns: count={}, rate={}'.format(counter, rate))
     return (counter, rate)
 
 def is_beam_open():
